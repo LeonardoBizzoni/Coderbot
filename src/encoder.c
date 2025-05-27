@@ -16,6 +16,7 @@ fn void encoder_task(void *_args) {
   // Si questi valori di runtime/deadline sono a cazzo di cane e si dobbiamo misurarli.
 
   for (;;) {
+    os_thread_cancelpoint();
     i64 delta_left = target_ticks_left - cb_encoder_left.ticks;
     i64 delta_right = target_ticks_right - cb_encoder_right.ticks;
 

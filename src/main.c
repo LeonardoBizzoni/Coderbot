@@ -37,6 +37,7 @@ fn void start(CmdLine *cli) {
 
   OS_Handle encoder = os_thread_start(encoder_task, 0);
   OS_Handle odometry = os_thread_start(odometry_task, 0);
-  os_thread_join(encoder);
-  os_thread_join(odometry);
+  os_sleep_milliseconds(cli->count < 1 ? 10 : i64_from_str8(cli->args[0]));
+  os_thread_kill(encoder);
+  os_thread_kill(odometry);
 }
