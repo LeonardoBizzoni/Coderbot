@@ -2,7 +2,9 @@
 cd "$(dirname "$0")"
 set -eu
 
-file="src/main.c"
+make -C libcoderbot
+
+file="src/main.c libcoderbot/libcoderbot.a"
 
 for arg in "$@"; do
     if [[ $arg == *=* ]]; then
@@ -14,7 +16,7 @@ for arg in "$@"; do
     fi
 done
 
-links="-lpthread -lm -lrt -I./src/base"
+links="-lpthread -lm -lrt -lpigpio -I./src/base -I."
 common_flags="-pedantic -Wall -Werror"
 no_annoying_warnings="-Wno-unused-function -Wno-gnu-zero-variadic-macro-arguments
                       -Wno-initializer-overrides -Wno-c23-extensions"
