@@ -14,7 +14,7 @@ for arg in "$@"; do
     fi
 done
 
-links="-lpthread -lm -I./src/base"
+links="-lpthread -lm -lrt -I./src/base"
 common_flags="-pedantic -Wall -Werror"
 no_annoying_warnings="-Wno-unused-function -Wno-gnu-zero-variadic-macro-arguments
                       -Wno-initializer-overrides -Wno-c23-extensions"

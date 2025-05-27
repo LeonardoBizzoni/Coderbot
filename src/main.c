@@ -2,25 +2,21 @@
 
 #include <base/base_inc.h>
 #include <OS/os_inc.h>
-
 #include <base/base_inc.c>
 #include <OS/os_inc.c>
 
+fn void deadline_handler(i32 sig) {
+  Err("A task missed its deadline!");
+  (void)signal(SIGXCPU, SIG_DFL);
+}
+
+#include "odometry.c"
+#include "encoder.c"
+
 fn void start(CmdLine *cli) {
-#if 1
-  printf("Compiler GCC:   %d\n", COMPILER_GCC);
-  printf("Compiler CL:    %d\n", COMPILER_CL);
-  printf("Compiler CLANG: %d\n", COMPILER_CLANG);
+  OS_Handle encoder = os_thread_start(encoder_task, 0);
+  OS_Handle odometry = os_thread_start(odometry_task, 0);
 
-  printf("OS GNU/Linux:   %d\n", OS_LINUX);
-  printf("OS BSD:         %d\n", OS_BSD);
-  printf("OS MAC:         %d\n", OS_MAC);
-  printf("OS Windows:     %d\n", OS_WINDOWS);
-
-  printf("Architecture x86 32bit: %d\n", ARCH_X86);
-  printf("Architecture x64 64bit: %d\n", ARCH_X64);
-  printf("Architecture ARM 32bit: %d\n", ARCH_ARM32);
-  printf("Architecture ARM 64bit: %d\n", ARCH_ARM64);
-#endif
-
+  os_thread_join(encoder);
+  os_thread_join(odometry);
 }
