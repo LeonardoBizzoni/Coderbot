@@ -1,0 +1,8 @@
+* Build&Run
+Nella root del progetto esegui:
+#+begin_src bash
+./build.sh 
+sudo ./main
+#+end_src
+
+L'eseguibile prodotto va eseguito con i permessi di amministratore per poter impostare le deadline delle task.
