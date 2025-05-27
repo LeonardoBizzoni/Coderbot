@@ -1,3 +1,6 @@
 [submodule "src/base"]
 	path = src/base
 	url = git@github.com:LeonardoBizzoni/CSTD.git
+[submodule "libcoderbot"]
+	path = libcoderbot
+	url = git@github.com:jack23247/libcoderbot.git
