@@ -8,6 +8,9 @@
 
 #define InitialDutyCycle 0.2
 
+// distanza tra le ruote in mm
+#define BASELINE_MM 120.0
+
 #define MillimeterFromTicks_Left  0.1306443689
 #define MillimeterFromTicks_Right 0.1330557259
 #define Kp_Left  0.005
