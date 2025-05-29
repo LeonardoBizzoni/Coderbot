@@ -14,12 +14,19 @@ fn void deadline_handler(i32 sig) {
   (void)signal(SIGXCPU, SIG_DFL);
 }
 
+global u64 measured_ticks_left = 0;
+global u64 measured_ticks_right = 0;
+
+global OS_Handle tick_mutex;
+
 #include "coderbot.c"
 #include "odometry.c"
 #include "encoder.c"
 
 fn void start(CmdLine *cli) {
   os_atexit(cb_stop);
+
+  tick_mutex = os_mutex_alloc();
 
   gpioInitialise();
   cbMotorGPIOinit(&cb_motor_left);

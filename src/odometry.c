@@ -1,6 +1,13 @@
 #include <math.h>
 #include <stdio.h>
 
+global double pose[4][4] = {
+  {1, 0, 0, 0},
+  {0, 1, 0, 0},
+  {0, 0, 1, 0},
+  {0, 0, 0, 1},
+};
+
 fn void odometry_task(void *_args) {
   //                     runtime ≤ deadline ≤ period
   lnx_sched_set_deadline(  1e6,      1e6,      1e9, deadline_handler);
@@ -8,11 +15,16 @@ fn void odometry_task(void *_args) {
    * e si dobbiamo misurarli. */
 
   for (;;) {
-    Info("Task per odometria");
+    os_mutex_lock(tick_mutex);
+    u64 ticks_left = measured_ticks_left;
+    u64 ticks_right = measured_ticks_right;
+    os_mutex_unlock(tick_mutex);
+
+    pose_update_from_ticks(ticks_left, ticks_right);
+    pose_print_info();
     lnx_sched_yield();
   }
 }
-
 
 // funzione di moltiplicazione matrici 4x4
 fn void prod_matrix_4_4(double res[4][4], double A[4][4], double B[4][4]) {
@@ -27,8 +39,7 @@ fn void prod_matrix_4_4(double res[4][4], double A[4][4], double B[4][4]) {
 }
 
 // aggiorna la pose usando i tick encoder
-fn void pose_update_from_ticks(double pose[4][4], int delta_left_ticks, int delta_right_ticks) {
-
+fn void pose_update_from_ticks(int delta_left_ticks, int delta_right_ticks) {
   // Calcola la distanza percorsa da ciascuna ruota in mm
   double dL = delta_left_ticks * MillimeterFromTicks_Left;
   double dR = delta_right_ticks * MillimeterFromTicks_Right;
@@ -52,7 +63,7 @@ fn void pose_update_from_ticks(double pose[4][4], int delta_left_ticks, int delt
 }
 
 // stampa la posizione del robot + angoli RPY e ZYZ
-fn void pose_print_info(double pose[4][4]) {
+fn void pose_print_info(void) {
   double x = pose[0][3];
   double y = pose[1][3];
   double z = pose[2][3];

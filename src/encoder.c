@@ -11,14 +11,19 @@ fn void encoder_task(void *_args) {
   cbDir_t motor_direction_left = forward, motor_direction_right = forward;
   f64 duty_cycle_left = InitialDutyCycle, duty_cycle_right = InitialDutyCycle;
 
-  //                     runtime ≤ deadline ≤  period
-  lnx_sched_set_deadline(  1e6,      1e6,  period_ms * 1e6, deadline_handler);
-  // Si questi valori di runtime/deadline sono a cazzo di cane e si dobbiamo misurarli.
+  /* runtime (WCET) ancora da misurare */
+  lnx_sched_set_deadline(1e6, period_ms * 1e6, period_ms * 1e6, deadline_handler);
 
   for (;;) {
     os_thread_cancelpoint();
-    i64 delta_left = target_ticks_left - cb_encoder_left.ticks;
-    i64 delta_right = target_ticks_right - cb_encoder_right.ticks;
+
+    os_mutex_lock(tick_mutex);
+    measured_ticks_left = cb_encoder_left.ticks;
+    measured_ticks_right = cb_encoder_right.ticks;
+    os_mutex_unlock(tick_mutex);
+
+    i64 delta_left = target_ticks_left - measured_ticks_left;
+    i64 delta_right = target_ticks_right - measured_ticks_right;
 
     duty_cycle_left = ((f64)delta_left * Kp_Left) + (accumalated_error_left * Ki_Left);
     duty_cycle_right = ((f64)delta_right * Kp_Right) + (accumalated_error_right * Ki_Right);
