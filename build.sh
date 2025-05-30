@@ -4,8 +4,6 @@ set -eu
 
 make -C libcoderbot
 
-file="src/main.c libcoderbot/libcoderbot.a"
-
 for arg in "$@"; do
     if [[ $arg == *=* ]]; then
         var="${arg%%=*}"
@@ -16,14 +14,22 @@ for arg in "$@"; do
     fi
 done
 
-links="-lpthread -lm -lrt -lpigpio -I./src/base -I."
+if [ -v reset ]; then
+    file="src/reset.c libcoderbot/libcoderbot.a"
+    outputf="reset.o"
+else
+    file="src/main.c libcoderbot/libcoderbot.a"
+    outputf="main.o"
+fi
+
+links="-lpigpio -lpthread -lm -lrt -I./src/base -I."
 common_flags="-pedantic -Wall -Werror -DPLATFORM_CODERBOT"
 no_annoying_warnings="-Wno-unused-function -Wno-initializer-overrides"
 no_annoying_cpp_warnings=""
 asan="-fsanitize=address,undefined"
 
 opt_flags="-O3 -s"
-dbg_flags="-O0 -g3 -ggdb ${asan} -DENABLE_ASSERT=1 -DDEBUG=1"
+dbg_flags="-DENABLE_ASSERT=1 -DDEBUG=1"
 
 cpp_mode="-std=c++23 -fno-exceptions"
 
@@ -47,4 +53,4 @@ elif [ -v clang ]; then printf "+ [ Clang "; fi
 
 if [ -v cpp ];   then printf "C++ "; else printf "C "; fi; printf "compilation ]\n"
 if [ -v debug ]; then echo "+ [ debug mode ]"; else echo "+ [ release mode ]"; fi
-(set -x; $compiler $file $flags -o main)
+(set -x; $compiler $file $flags -o $outputf)
