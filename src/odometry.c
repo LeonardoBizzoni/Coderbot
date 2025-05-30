@@ -10,7 +10,7 @@ global double pose[4][4] = {
 
 fn void odometry_task(void *_args) {
   //                     runtime ≤ deadline ≤ period
-  lnx_sched_set_deadline(  1e6,      1e6,      1e9, deadline_handler);
+  lnx_sched_set_deadline(2 * 1e9, 2 * 1e9, 2 * 1e9, deadline_handler);
   /* Si questi valori di runtime/deadline/period sono a cazzo di cane
    * e si dobbiamo misurarli. */
 
@@ -28,6 +28,8 @@ fn void odometry_task(void *_args) {
 
 // funzione di moltiplicazione matrici 4x4
 fn void prod_matrix_4_4(double res[4][4], double A[4][4], double B[4][4]) {
+  // NOTE(lb): gcc riesce a produrre asm vettorizzato o
+  //           tocca scrivere SIMD a mano? e il coderbot ha almeno AVX?
   memZero(res, sizeof(double[4][4]));
   for(int i = 0; i < 4; ++i) {
     for(int j = 0; j < 4; ++j) {
@@ -39,10 +41,10 @@ fn void prod_matrix_4_4(double res[4][4], double A[4][4], double B[4][4]) {
 }
 
 // aggiorna la pose usando i tick encoder
-fn void pose_update_from_ticks(int delta_left_ticks, int delta_right_ticks) {
+fn void pose_update_from_ticks(int measured_left, int measured_right) {
   // Calcola la distanza percorsa da ciascuna ruota in mm
-  double dL = delta_left_ticks * MillimeterFromTicks_Left;
-  double dR = delta_right_ticks * MillimeterFromTicks_Right;
+  double dL = measured_left * MillimeterFromTicks_Left;
+  double dR = measured_right * MillimeterFromTicks_Right;
 
   // Calcola la distanza percorsa dal centro del robot
   double d = (dL + dR) / 2.0;

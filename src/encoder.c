@@ -12,11 +12,10 @@ fn void encoder_task(void *_args) {
   f64 duty_cycle_left = InitialDutyCycle, duty_cycle_right = InitialDutyCycle;
 
   /* runtime (WCET) ancora da misurare */
-  lnx_sched_set_deadline(1e6, period_ms * 1e6, period_ms * 1e6, deadline_handler);
+  /* lnx_sched_set_deadline(1e6, period_ms * 1e9, period_ms * 1e9, deadline_handler); */
+  lnx_sched_set_deadline(2 * 1e9, 2 * 1e9, 2 * 1e9, deadline_handler);
 
   for (;;) {
-    os_thread_cancelpoint();
-
     os_mutex_lock(tick_mutex);
     measured_ticks_left = cb_encoder_left.ticks;
     measured_ticks_right = cb_encoder_right.ticks;
@@ -53,6 +52,7 @@ fn void encoder_task(void *_args) {
     cbMotorMove(&cb_motor_left, motor_direction_left, duty_cycle_left);
     cbMotorMove(&cb_motor_right, motor_direction_right, duty_cycle_right);
 
+    os_thread_cancelpoint();
     lnx_sched_yield();
   }
 }
