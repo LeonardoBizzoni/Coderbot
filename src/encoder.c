@@ -1,7 +1,4 @@
 fn void encoder_task(void *_args) {
-  f64 duty_cicle_from_ticks_left = Duty_CycleFromTicks_Left;
-  f64 duty_cicle_from_ticks_right = Duty_CycleFromTicks_Right;
-
   i64 period_ms = 20;
   // (cm/s) / (mm/tick / 10mm) = (cm/s) * (tick/cm) = tick/s
   f64 target_ticksXsec_left = TargetSpeed / (MillimeterFromTicks_Left / 10.);
@@ -14,9 +11,8 @@ fn void encoder_task(void *_args) {
   f64 duty_cycle_left = InitialDutyCycle, duty_cycle_right = InitialDutyCycle;
   i64 accumalated_error_left = 0, accumalated_error_right = 0, activations = 0;
 
-  /* runtime (WCET) ancora da misurare */
-  /* lnx_sched_set_deadline(1e6, period_ms * 1e9, period_ms * 1e9, deadline_handler); */
-  lnx_sched_set_deadline(2 * 1e9, 2 * 1e9, 3 * 1e9, deadline_handler);
+  lnx_sched_set_deadline((period_ms - 1) * 1e6, (period_ms - 1) * 1e6,
+                         period_ms * 1e6, deadline_handler);
 
   for (;;) {
     os_mutex_lock(tick_mutex);
@@ -31,10 +27,9 @@ fn void encoder_task(void *_args) {
     accumalated_error_left += delta_left;
     accumalated_error_right += delta_right;
 
-    duty_cycle_left = duty_cicle_from_ticks_left * (f64)delta_left;
-    duty_cycle_right = duty_cicle_from_ticks_right * (f64)delta_right;
+    duty_cycle_left = Kp_Left * delta_left + Ki_Left * accumalated_error_left;
+    duty_cycle_right = Kp_Right * delta_right + Ki_Right * accumalated_error_right;
 
-    /* printf("duty_cycle_too_high_counter: %ld\n", duty_cycle_too_high_counter); */
     printf("Left:\n\ttarget ticks: %ld\n\tmeasured ticks: %ld\n\tdelta: %ld"
            "\n\taccumulated error: %ld\n\taccumulated error average: %lf"
            "\n\tduty cycle uncapped: %lf\n",

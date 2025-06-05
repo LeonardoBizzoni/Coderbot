@@ -15,22 +15,32 @@ fn void deadline_handler(i32 sig) {
   os_exit(-1);
 }
 
+global OS_Handle tick_mutex;
 global u64 measured_ticks_left = 0;
 global u64 measured_ticks_right = 0;
-
-global OS_Handle tick_mutex;
 
 #include "coderbot.c"
 #include "odometry.c"
 #include "encoder.c"
 
+// task: cartesian controller (local planner)
+// task: controllo encoder
+// task: odometria
+
 void start(CmdLine *cmd) {
-  gpioInitialise();
+  tick_mutex = os_mutex_alloc();
+  i32 version = gpioInitialise();
+  if (version < 0) {
+    printf("gpioInitialise ha avuto un errore\n");
+    os_exit(-1);
+  } else {
+    printf("version gpioInitialise: %d\n", version);
+  }
+
   cbMotorGPIOinit(&cb_motor_left);
   cbMotorGPIOinit(&cb_motor_right);
   cbEncoderGPIOinit(&cb_encoder_left);
   cbEncoderGPIOinit(&cb_encoder_right);
-  os_atexit(cb_stop);
 
   gpioSetISRFuncEx(cb_encoder_left.pin_a, EITHER_EDGE, 50,
                    cb_encoder_callback_isrA, &cb_encoder_left);
@@ -42,6 +52,10 @@ void start(CmdLine *cmd) {
                    cb_encoder_callback_isrB, &cb_encoder_right);
 
   OS_Handle encoder_thd = os_thread_start(encoder_task, 0);
-  os_sleep_milliseconds(4000);
-  os_thread_kill(encoder_thd);
+  OS_Handle odometry_thd = os_thread_start(odometry_task, 0);
+
+  os_sleep_milliseconds(4 * 1e3);
+  os_thread_cancel(encoder_thd);
+  os_thread_cancel(odometry_thd);
+  cb_stop();
 }

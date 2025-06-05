@@ -1,8 +1,24 @@
 * Build&Run
 Nella root del progetto esegui:
 #+begin_src bash
-./build.sh 
-sudo ./main
+./build.sh
+sudo ./main.o
 #+end_src
 
 L'eseguibile prodotto va eseguito con i permessi di amministratore per poter impostare le deadline delle task.
+
+* Errore
+#+begin_example
+2025-05-07 18:31:08 sigHandler: Unhandled signal 11, terminating
+
+2025-05-07 18:31:09 gpioWrite: pigpio uninitialised, call gpioInitialise()
+2025-05-07 18:31:09 gpioWrite: pigpio uninitialised, call gpioInitialise()
+2025-05-07 18:31:09 gpioWrite: pigpio uninitialised, call gpioInitialise()
+2025-05-07 18:31:09 gpioWrite: pigpio uninitialised, call gpioInitialise()
+2025-05-07 18:31:09 gpioSetISRFuncEx: pigpio uninitialised, call gpioInitialise()
+2025-05-07 18:31:09 gpioSetISRFuncEx: pigpio uninitialised, call gpioInitialise()
+2025-05-07 18:31:09 gpioSetISRFuncEx: pigpio uninitialised, call gpioInitialise()
+2025-05-07 18:31:09 gpioSetISRFuncEx: pigpio uninitialised, call gpioInitialise()
+#+end_example
+
+Questi messagi ci sono solo nella versione multithreaded in `main.c`, il quale è un adattamento di `single_thread.c` che invece funziona correttamente.
