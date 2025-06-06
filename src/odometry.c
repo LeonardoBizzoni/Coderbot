@@ -1,12 +1,16 @@
 #include <math.h>
 #include <stdio.h>
 
-global double pose[4][4] = {
-  {1, 0, 0, 0},
-  {0, 1, 0, 0},
-  {0, 0, 1, 0},
-  {0, 0, 0, 1},
-};
+global f64 pose[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};      // MATRICE per POSE (totale)
+global f64 pose_dof[3] = {0, 0, 0,};                            // VETTORE per POSE (totale)
+global f64 new_pose[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};  // MATRICE per POSE (corrente)
+
+// MATRICI di SUPPORTO
+global f64 rt[3][3],   // rototraslazione
+           r[3][3],    // rotazione
+           t1[3][3],   // traslazione al CIR
+           t2[3][3],   // traslazione dal CIR
+           temp[3][3]; // temporanea
 
 fn void odometry_task(void *_args) {
   //                     runtime ≤ deadline ≤ period
@@ -20,70 +24,66 @@ fn void odometry_task(void *_args) {
     u64 ticks_right = measured_ticks_right;
     os_mutex_unlock(tick_mutex);
 
-    pose_update_from_ticks(ticks_left, ticks_right);
-    pose_print_info();
+    /* ODOMETRIA */
+    // calcolo MILLIMETRI percorsi
+    millimeter_traveled_left = ticks_left * MillimeterFromTicks_Left; // ruota sinistra
+    millimeter_traveled_right = ticks_right * MillimeterFromTicks_Right; // ruota destra
+
+    // calcolo ANGOLO
+    f64 delta_theta = -(millimeter_traveled_left - millimeter_traveled_right) / BASELINE_MM;
+
+    // SOGLIA (ticks sinistra e destra mai esattamente uguali, anche se dritto)
+    if (Abs(delta_theta) < THRESHOLD) {
+      // movimento: DRITTO
+      // calcolo matrice di ROTOTRASLAZIONE corrente
+      rt[0][0] = 1; rt[0][1] = 0; rt[0][2] = (millimeter_traveled_left + millimeter_traveled_right) / 2;
+      rt[1][0] = 0; rt[1][1] = 1; rt[1][2] = 0;
+      rt[2][0] = 0; rt[2][1] = 0; rt[2][2] = 1;
+    } else {
+      // movimento: CURVANDO
+      f64 d = (millimeter_traveled_right / delta_theta) - (BASELINE_MM / 2);
+      // TRASLAZIONE al CIR
+      t1[0][0] = 1; t1[0][1] = 0; t1[0][2] = 0;
+      t1[1][0] = 0; t1[1][1] = 1; t1[1][2] = -d;
+      t1[2][0] = 0; t1[2][1] = 0; t1[2][2] = 1;
+      // ROTAZIONE
+      r[0][0] = cos(delta_theta); r[0][1] = -sin(delta_theta); r[0][2] = 0;
+      r[1][0] = sin(delta_theta); r[1][1] = cos(delta_theta); r[1][2] = 0;
+      r[2][0] = 0; r[2][1] = 0; r[2][2] = 1;
+      // TRASLAZIONE dal CIR
+      t2[0][0] = 1; t2[0][1] = 0; t2[0][2] = 0;
+      t2[1][0] = 0; t2[1][1] = 1; t2[1][2] = d;
+      t2[2][0] = 0; t2[2][1] = 0; t2[2][2] = 1;
+      // calcolo matrice di ROTOTRASLAZIONE corrente
+      moltiplica_matrici_3x3(t2, r, temp);
+      moltiplica_matrici_3x3(temp, t1, rt);
+    }
+
+    // calcolo (nuova) POSE
+    moltiplica_matrici_3x3(pose, rt, new_pose);
+    for (usize r = 0; r < 3; r++) {
+      for (usize c = 0; c < 3; c++) {
+        pose[r][c] = new_pose[r][c];
+      }
+    }
+
+    // creazione VETTORE per POSE
+    pose_dof[0] = pose[0][2]; // posizione x
+    pose_dof[1] = pose[1][2]; // posizione y
+    pose_dof[2] = atan2(pose[1][0], pose[0][0]); // angolo theta
+
+    os_thread_cancelpoint();
     lnx_sched_yield();
   }
 }
 
-// funzione di moltiplicazione matrici 4x4
-fn void prod_matrix_4_4(double res[4][4], double A[4][4], double B[4][4]) {
-  // NOTE(lb): gcc riesce a produrre asm vettorizzato o
-  //           tocca scrivere SIMD a mano? e il coderbot ha almeno AVX?
-  memZero(res, sizeof(double[4][4]));
-  for(int i = 0; i < 4; ++i) {
-    for(int j = 0; j < 4; ++j) {
-      for(int k = 0; k < 4; ++k) {
-        res[i][j] += A[i][k] * B[k][j];
+fn void moltiplica_matrici_3x3(f64 lhs[3][3], f64 rhs[3][3], f64 output[3][3]) {
+  memZero(output, sizeof(f64[3][3]));
+  for (usize i = 0; i < 3; ++i) {
+    for (usize j = 0; j < 3; ++j) {
+      for (usize r = 0; r < 3; ++r) {
+        output[i][j] += lhs[i][r] * rhs[r][j];
       }
     }
   }
-}
-
-// aggiorna la pose usando i tick encoder
-fn void pose_update_from_ticks(int measured_left, int measured_right) {
-  // Calcola la distanza percorsa da ciascuna ruota in mm
-  double dL = measured_left * MillimeterFromTicks_Left;
-  double dR = measured_right * MillimeterFromTicks_Right;
-
-  // Calcola la distanza percorsa dal centro del robot
-  double d = (dL + dR) / 2.0;
-
-  // Calcola la variazione dell'angolo di orientamento (in radianti)
-  // in base alla differenza tra le due ruote
-  double delta_theta = (dR - dL) / BASELINE_MM;
-
-  // Costruisce la matrice omogenea 4x4 di roto-traslazione T
-  double T[4][4] = {
-    {cos(delta_theta), -sin(delta_theta), 0, d},
-    {sin(delta_theta),  cos(delta_theta), 0, 0},
-    {0,                 0,                1, 0},
-    {0,                 0,                0, 1}
-  };
-
-  prod_matrix_4_4(pose, pose, T);
-}
-
-// stampa la posizione del robot + angoli RPY e ZYZ
-fn void pose_print_info(void) {
-  double x = pose[0][3];
-  double y = pose[1][3];
-  double z = pose[2][3];
-
-  // Angoli ZYZ (Euler)
-  double theta_z1 = atan2(pose[1][2], pose[0][2]);
-  double theta_y  = atan2(sqrt(pow(pose[0][2],2)+pow(pose[1][2],2)), pose[2][2]);
-  double theta_z2 = atan2(pose[2][1], -pose[2][0]);
-
-  // Angoli RPY (Roll-Pitch-Yaw)
-  double roll  = atan2(pose[1][0], pose[0][0]);
-  double pitch = atan2(-pose[2][0], sqrt(pow(pose[2][1],2)+pow(pose[2][2],2)));
-  double yaw   = atan2(pose[2][1], pose[2][2]);
-
-  /* TODO(lb): add a lock to avoid messy logging? */
-  printf("\nPosizione → x = %.2f mm, y = %.2f mm, z = %.2f mm\n", x, y, z);
-  printf("ZYZ Euler (°): Z1 = %.2f, Y = %.2f, Z2 = %.2f\n",
-         theta_z1 * 180/M_PI, theta_y * 180/M_PI, theta_z2 * 180/M_PI);
-  printf("RPY (°): Roll = %.2f, Pitch = %.2f, Yaw = %.2f\n\n",
-         roll * 180/M_PI, pitch * 180/M_PI, yaw * 180/M_PI);
 }

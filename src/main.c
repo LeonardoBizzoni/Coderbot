@@ -19,6 +19,9 @@ global OS_Handle tick_mutex;
 global u64 measured_ticks_left = 0;
 global u64 measured_ticks_right = 0;
 
+global f64 millimeter_traveled_left = 0;
+global f64 millimeter_traveled_right = 0;
+
 #include "coderbot.c"
 #include "odometry.c"
 #include "encoder.c"
