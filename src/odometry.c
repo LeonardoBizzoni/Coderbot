@@ -1,16 +1,15 @@
 #include <math.h>
 #include <stdio.h>
 
-global f64 pose[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};      // MATRICE per POSE (totale)
-global f64 pose_dof[3] = {0, 0, 0,};                            // VETTORE per POSE (totale)
-global f64 new_pose[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};  // MATRICE per POSE (corrente)
+global f32 pose[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};      // MATRICE per POSE (totale)
+global f32 new_pose[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};  // MATRICE per POSE (corrente)
 
 // MATRICI di SUPPORTO
-global f64 rt[3][3],   // rototraslazione
-           r[3][3],    // rotazione
-           t1[3][3],   // traslazione al CIR
-           t2[3][3],   // traslazione dal CIR
-           temp[3][3]; // temporanea
+global f32 rt[3][3]   = {0}, // rototraslazione
+           r[3][3]    = {0}, // rotazione
+           t1[3][3]   = {0}, // traslazione al CIR
+           t2[3][3]   = {0}, // traslazione dal CIR
+           temp[3][3] = {0}; // temporanea
 
 fn void odometry_task(void *_args) {
   //                     runtime ≤ deadline ≤ period
@@ -30,7 +29,7 @@ fn void odometry_task(void *_args) {
     millimeter_traveled_right = ticks_right * MillimeterFromTicks_Right; // ruota destra
 
     // calcolo ANGOLO
-    f64 delta_theta = -(millimeter_traveled_left - millimeter_traveled_right) / BASELINE_MM;
+    f32 delta_theta = -(millimeter_traveled_left - millimeter_traveled_right) / BASELINE_MM;
 
     // SOGLIA (ticks sinistra e destra mai esattamente uguali, anche se dritto)
     if (Abs(delta_theta) < THRESHOLD) {
@@ -41,7 +40,7 @@ fn void odometry_task(void *_args) {
       rt[2][0] = 0; rt[2][1] = 0; rt[2][2] = 1;
     } else {
       // movimento: CURVANDO
-      f64 d = (millimeter_traveled_right / delta_theta) - (BASELINE_MM / 2);
+      f32 d = (millimeter_traveled_right / delta_theta) - (BASELINE_MM / 2);
       // TRASLAZIONE al CIR
       t1[0][0] = 1; t1[0][1] = 0; t1[0][2] = 0;
       t1[1][0] = 0; t1[1][1] = 1; t1[1][2] = -d;
@@ -68,17 +67,20 @@ fn void odometry_task(void *_args) {
     }
 
     // creazione VETTORE per POSE
-    pose_dof[0] = pose[0][2]; // posizione x
-    pose_dof[1] = pose[1][2]; // posizione y
-    pose_dof[2] = atan2(pose[1][0], pose[0][0]); // angolo theta
+    os_mutex_lock(pose_mutex);
+    DeferLoop(os_mutex_unlock(pose_mutex)) {
+      pose_dof[0] = pose[0][2]; // posizione x
+      pose_dof[1] = pose[1][2]; // posizione y
+      pose_dof[2] = atan2(pose[1][0], pose[0][0]); // angolo theta
+    }
 
     os_thread_cancelpoint();
     lnx_sched_yield();
   }
 }
 
-fn void moltiplica_matrici_3x3(f64 lhs[3][3], f64 rhs[3][3], f64 output[3][3]) {
-  memZero(output, sizeof(f64[3][3]));
+fn void moltiplica_matrici_3x3(f32 lhs[3][3], f32 rhs[3][3], f32 output[3][3]) {
+  memZero(output, sizeof(f32[3][3]));
   for (usize i = 0; i < 3; ++i) {
     for (usize j = 0; j < 3; ++j) {
       for (usize r = 0; r < 3; ++r) {

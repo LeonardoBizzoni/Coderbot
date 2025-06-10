@@ -1,20 +1,23 @@
 fn void encoder_task(void *_args) {
   i64 period_ms = 20;
-  // (cm/s) / (mm/tick / 10mm) = (cm/s) * (tick/cm) = tick/s
-  f64 target_ticksXsec_left = TargetSpeed / (MillimeterFromTicks_Left / 10.);
-  f64 target_ticksXsec_right = TargetSpeed / (MillimeterFromTicks_Right / 10.);
-  // (tick/s) * (ms / 1000ms) = tick
-  u64 target_ticks_left = target_ticksXsec_left * ((f64)period_ms / 1000.);
-  u64 target_ticks_right = target_ticksXsec_right * ((f64)period_ms / 1000.);
-
-  cbDir_t motor_direction_left = forward, motor_direction_right = forward;
-  f64 duty_cycle_left = InitialDutyCycle, duty_cycle_right = InitialDutyCycle;
-  i64 accumalated_error_left = 0, accumalated_error_right = 0, activations = 0;
-
   lnx_sched_set_deadline((period_ms - 1) * 1e6, (period_ms - 1) * 1e6,
                          period_ms * 1e6, deadline_handler);
 
   for (;;) {
+    os_mutex_lock(speed_mutex);
+    // (cm/s) / (mm/tick / 10mm) = (cm/s) * (tick/cm) = tick/s
+    f32 target_ticksXsec_left = speed_left / (MillimeterFromTicks_Left / 10.);
+    f32 target_ticksXsec_right = speed_right / (MillimeterFromTicks_Right / 10.);
+    os_mutex_unlock(speed_mutex);
+
+    // (tick/s) * (ms / 1000ms) = tick
+    u64 target_ticks_left = target_ticksXsec_left * ((f32)period_ms / 1000.);
+    u64 target_ticks_right = target_ticksXsec_right * ((f32)period_ms / 1000.);
+
+    cbDir_t motor_direction_left = forward, motor_direction_right = forward;
+    f32 duty_cycle_left = InitialDutyCycle, duty_cycle_right = InitialDutyCycle;
+    i64 accumalated_error_left = 0, accumalated_error_right = 0, activations = 0;
+
     os_mutex_lock(tick_mutex);
     measured_ticks_left = cb_encoder_left.ticks;
     measured_ticks_right = cb_encoder_right.ticks;
@@ -34,12 +37,12 @@ fn void encoder_task(void *_args) {
            "\n\taccumulated error: %ld\n\taccumulated error average: %lf"
            "\n\tduty cycle uncapped: %lf\n",
            target_ticks_left, cb_encoder_left.ticks, delta_left, accumalated_error_left,
-           (f64)accumalated_error_left / (f64)activations, duty_cycle_left);
+           (f32)accumalated_error_left / (f32)activations, duty_cycle_left);
     printf("Right:\n\ttarget ticks: %ld\n\tmeasured ticks: %ld\n\tdelta: %ld"
            "\n\taccumulated error: %ld\n\taccumulated error average: %lf"
            "\n\tduty cycle uncapped: %lf\n",
            target_ticks_right, cb_encoder_right.ticks, delta_right, accumalated_error_right,
-           (f64)accumalated_error_right / (f64)activations, duty_cycle_right);
+           (f32)accumalated_error_right / (f32)activations, duty_cycle_right);
 
     motor_direction_left = duty_cycle_left < 0 ? backward : forward;
     motor_direction_right = duty_cycle_right < 0 ? backward : forward;
