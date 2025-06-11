@@ -4,11 +4,11 @@ fn void encoder_task(void *_args) {
                          period_ms * 1e6, deadline_handler);
 
   for (;;) {
-    os_mutex_lock(speed_mutex);
+    os_mutex_lock(state.speed.mutex);
     // (cm/s) / (mm/tick / 10mm) = (cm/s) * (tick/cm) = tick/s
-    f32 target_ticksXsec_left = speed_left / (MillimeterFromTicks_Left / 10.);
-    f32 target_ticksXsec_right = speed_right / (MillimeterFromTicks_Right / 10.);
-    os_mutex_unlock(speed_mutex);
+    f32 target_ticksXsec_left = state.speed.left / (MillimeterFromTicks_Left / 10.);
+    f32 target_ticksXsec_right = state.speed.right / (MillimeterFromTicks_Right / 10.);
+    os_mutex_unlock(state.speed.mutex);
 
     // (tick/s) * (ms / 1000ms) = tick
     u64 target_ticks_left = target_ticksXsec_left * ((f32)period_ms / 1000.);
@@ -18,13 +18,13 @@ fn void encoder_task(void *_args) {
     f32 duty_cycle_left = InitialDutyCycle, duty_cycle_right = InitialDutyCycle;
     i64 accumalated_error_left = 0, accumalated_error_right = 0, activations = 0;
 
-    os_mutex_lock(tick_mutex);
-    measured_ticks_left = cb_encoder_left.ticks;
-    measured_ticks_right = cb_encoder_right.ticks;
-    os_mutex_unlock(tick_mutex);
+    os_mutex_lock(state.tick.mutex);
+    state.tick.measured_left = cb_encoder_left.ticks;
+    state.tick.measured_right = cb_encoder_right.ticks;
+    os_mutex_unlock(state.tick.mutex);
 
-    i64 delta_left = target_ticks_left - measured_ticks_left;
-    i64 delta_right = target_ticks_right - measured_ticks_right;
+    i64 delta_left = target_ticks_left - state.tick.measured_left;
+    i64 delta_right = target_ticks_right - state.tick.measured_right;
 
     activations += 1;
     accumalated_error_left += delta_left;

@@ -41,49 +41,49 @@ fn void cartesian_task(void *args) {
   for (;;) {
     /* CARTESIAN CONTROLLER */
     // POSIZIONE CORRENTE REALE (da odometria) APPROSSIMATA AL PUNTO della TRAIETTORIA PIU' VICINO
-    os_mutex_lock(pose_mutex);
+    os_mutex_lock(state.pose.mutex);
     f32 pose[3] = {0};
     memCopy(pose, pose, 3 * sizeof(f32));
-    os_mutex_unlock(pose_mutex);
+    os_mutex_unlock(state.pose.mutex);
 
     i32 current_position = nearest_point_position(pose);
     if(current_position >= N_POINTS - 3) {
-      os_mutex_lock(speed_mutex);
-      DeferLoop(os_mutex_unlock(speed_mutex)) {
-        speed_left = 0;
-        speed_right = 0;
+      os_mutex_lock(state.speed.mutex);
+      DeferLoop(os_mutex_unlock(state.speed.mutex)) {
+        state.speed.left = 0;
+        state.speed.right = 0;
       }
       return;
     }
 
     // waypoints[current_position + 3] POSIZIONE che si PUNTA (per evitare errori, non troppo vicina, quindi +3 posizioni)
     // waypoints[current_position].XY POSIZIONE CORRENTE REALE (da odometria) APPROSSIMATA AL PUNTO della TRAIETTORIA PIU' VICINO
-    float delta_x = waypoints[current_position + 3].x - waypoints[current_position].x;
-    float delta_y = waypoints[current_position + 3].y - waypoints[current_position].y;
-    float desired_theta = atan2(delta_y, delta_x);
-    float delta_theta_c = desired_theta - pose[2]; // errore dell'angolo
+    f32 delta_x = waypoints[current_position + 3].x - waypoints[current_position].x;
+    f32 delta_y = waypoints[current_position + 3].y - waypoints[current_position].y;
+    f32 desired_theta = atan2(delta_y, delta_x);
+    f32 delta_theta_c = desired_theta - pose[2]; // errore dell'angolo
 
     // NORMALIZZAZIONE delta_theta_c in [-π, π]
     while (delta_theta_c > M_PI) { delta_theta_c -= 2 * M_PI; }
     while (delta_theta_c < -M_PI) { delta_theta_c += 2 * M_PI; }
 
-    os_mutex_lock(speed_mutex);
-    DeferLoop(os_mutex_unlock(speed_mutex)) {
+    os_mutex_lock(state.speed.mutex);
+    DeferLoop(os_mutex_unlock(state.speed.mutex)) {
       // CONFRONTO con TOLLERANZA dell'(errore dell')ANGOLO
       if (Abs(delta_theta_c) < ANGLE_TOLLERANCE) {
         // ANGOLO (piu' o meno) CORRETTO, si PROCEDE in LINEA RETTA per PUNTARE alla POSIZIONE
-        speed_left = TargetSpeed;
-        speed_right = TargetSpeed;
+        state.speed.left = TargetSpeed;
+        state.speed.right = TargetSpeed;
       } else {
         // CORREZIONE VELOCITA' per STERZARE
         if(delta_theta_c < 0) {
           // sterzare a DESTRA
-          speed_left = TargetSpeed;
-          speed_right = TargetSpeed * (1 / Abs((delta_theta_c * 180) / M_PI)); // correzione VELOCITA' PROPORZIONALE all'ERRORE
+          state.speed.left = TargetSpeed;
+          state.speed.right = TargetSpeed * (1 / Abs((delta_theta_c * 180) / M_PI)); // correzione VELOCITA' PROPORZIONALE all'ERRORE
         } else {
           // sterzare a SINISTRA
-          speed_left = TargetSpeed * (1 / Abs((delta_theta_c * 180) / M_PI)); // correzione VELOCITA' PROPORZIONALE all'ERRORE
-          speed_right = TargetSpeed;
+          state.speed.left = TargetSpeed * (1 / Abs((delta_theta_c * 180) / M_PI)); // correzione VELOCITA' PROPORZIONALE all'ERRORE
+          state.speed.right = TargetSpeed;
         }
       }
     }

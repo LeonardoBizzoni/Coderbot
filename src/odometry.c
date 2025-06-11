@@ -18,29 +18,29 @@ fn void odometry_task(void *_args) {
    * e si dobbiamo misurarli. */
 
   for (;;) {
-    os_mutex_lock(tick_mutex);
-    u64 ticks_left = measured_ticks_left;
-    u64 ticks_right = measured_ticks_right;
-    os_mutex_unlock(tick_mutex);
+    os_mutex_lock(state.tick.mutex);
+    u64 ticks_left = state.tick.measured_left;
+    u64 ticks_right = state.tick.measured_right;
+    os_mutex_unlock(state.tick.mutex);
 
     /* ODOMETRIA */
     // calcolo MILLIMETRI percorsi
-    millimeter_traveled_left = ticks_left * MillimeterFromTicks_Left; // ruota sinistra
-    millimeter_traveled_right = ticks_right * MillimeterFromTicks_Right; // ruota destra
+    state.distance_traveled.left = ticks_left * MillimeterFromTicks_Left; // ruota sinistra
+    state.distance_traveled.right = ticks_right * MillimeterFromTicks_Right; // ruota destra
 
     // calcolo ANGOLO
-    f32 delta_theta = -(millimeter_traveled_left - millimeter_traveled_right) / BASELINE_MM;
+    f32 delta_theta = -(state.distance_traveled.left - state.distance_traveled.right) / BASELINE_MM;
 
     // SOGLIA (ticks sinistra e destra mai esattamente uguali, anche se dritto)
     if (Abs(delta_theta) < THRESHOLD) {
       // movimento: DRITTO
       // calcolo matrice di ROTOTRASLAZIONE corrente
-      rt[0][0] = 1; rt[0][1] = 0; rt[0][2] = (millimeter_traveled_left + millimeter_traveled_right) / 2;
+      rt[0][0] = 1; rt[0][1] = 0; rt[0][2] = (state.distance_traveled.left + state.distance_traveled.right) / 2;
       rt[1][0] = 0; rt[1][1] = 1; rt[1][2] = 0;
       rt[2][0] = 0; rt[2][1] = 0; rt[2][2] = 1;
     } else {
       // movimento: CURVANDO
-      f32 d = (millimeter_traveled_right / delta_theta) - (BASELINE_MM / 2);
+      f32 d = (state.distance_traveled.right / delta_theta) - (BASELINE_MM / 2);
       // TRASLAZIONE al CIR
       t1[0][0] = 1; t1[0][1] = 0; t1[0][2] = 0;
       t1[1][0] = 0; t1[1][1] = 1; t1[1][2] = -d;
@@ -67,11 +67,11 @@ fn void odometry_task(void *_args) {
     }
 
     // creazione VETTORE per POSE
-    os_mutex_lock(pose_mutex);
-    DeferLoop(os_mutex_unlock(pose_mutex)) {
-      pose_dof[0] = pose[0][2]; // posizione x
-      pose_dof[1] = pose[1][2]; // posizione y
-      pose_dof[2] = atan2(pose[1][0], pose[0][0]); // angolo theta
+    os_mutex_lock(state.pose.mutex);
+    DeferLoop(os_mutex_unlock(state.pose.mutex)) {
+      state.pose.dof[0] = pose[0][2]; // posizione x
+      state.pose.dof[1] = pose[1][2]; // posizione y
+      state.pose.dof[2] = atan2(pose[1][0], pose[0][0]); // angolo theta
     }
 
     os_thread_cancelpoint();

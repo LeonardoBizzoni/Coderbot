@@ -16,19 +16,26 @@ fn void deadline_handler(i32 sig) {
   os_exit(-1);
 }
 
-global OS_Handle tick_mutex;
-global u64 measured_ticks_left = 0;
-global u64 measured_ticks_right = 0;
-
-global OS_Handle pose_mutex;
-global f32 pose_dof[3] = {0, 0, 0,}; // VETTORE per POSE (totale)
-
-global OS_Handle speed_mutex;
-global f32 speed_left = 0;
-global f32 speed_right = 0;
-
-global f32 millimeter_traveled_left = 0;
-global f32 millimeter_traveled_right = 0;
+global struct {
+  struct {
+    OS_Handle mutex;
+    u64 measured_left;
+    u64 measured_right;
+  } tick;
+  struct {
+    f32 left;
+    f32 right;
+  } distance_traveled; // in mm
+  struct {
+    OS_Handle mutex;
+    f32 dof[3]; // VETTORE per POSE (totale)
+  } pose;
+  struct {
+    OS_Handle mutex;
+    f32 left;
+    f32 right;
+  } speed;
+} state = {0};
 
 #include "coderbot.c"
 #include "odometry.c"
@@ -40,9 +47,9 @@ global f32 millimeter_traveled_right = 0;
 // task: odometria
 
 void start(CmdLine *cmd) {
-  tick_mutex = os_mutex_alloc();
-  pose_mutex = os_mutex_alloc();
-  speed_mutex = os_mutex_alloc();
+  state.tick.mutex = os_mutex_alloc();
+  state.pose.mutex = os_mutex_alloc();
+  state.speed.mutex = os_mutex_alloc();
 
   i32 version = gpioInitialise();
   if (version < 0) {
