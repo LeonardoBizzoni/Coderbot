@@ -44,10 +44,12 @@ fn void cartesian_task(void *_args) {
 
     i32 current_position = nearest_point_position(pose);
     if(current_position >= N_POINTS - 3) {
+      Info("Trajectory finished");
       DeferLoop(os_mutex_lock(state.speed.mutex), os_mutex_unlock(state.speed.mutex)) {
         state.speed.left = 0;
         state.speed.right = 0;
       }
+      lnx_signal_send_private(SIGUSR1);
       return;
     }
 

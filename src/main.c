@@ -82,7 +82,9 @@ void start(CmdLine *cmd) {
   OS_Handle odometry_thd = os_thread_start(odometry_task, 0);
   OS_Handle cartesian_thd = os_thread_start(cartesian_task, 0);
 
-  os_sleep_milliseconds(4 * 1e3);
+  /* os_sleep_milliseconds(4 * 1e3); */
+  lnx_signal_wait(SIGUSR1);
+
   os_thread_cancel(encoder_thd);
   os_thread_cancel(odometry_thd);
   os_thread_cancel(cartesian_thd);
