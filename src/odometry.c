@@ -17,30 +17,35 @@ fn void odometry_task(void *_args) {
   /* Si questi valori di runtime/deadline/period sono a cazzo di cane
    * e si dobbiamo misurarli. */
 
+  state.distance_traveled.left = 0;
+  state.distance_traveled.right = 0;
+
   for (;;) {
     os_mutex_lock(state.tick.mutex);
-    u64 ticks_left = state.tick.measured_left;
-    u64 ticks_right = state.tick.measured_right;
+    i64 ticks_left = state.tick.measured_left;
+    i64 ticks_right = state.tick.measured_right;
     os_mutex_unlock(state.tick.mutex);
 
     /* ODOMETRIA */
     // calcolo MILLIMETRI percorsi
-    state.distance_traveled.left = ticks_left * MillimeterFromTicks_Left; // ruota sinistra
-    state.distance_traveled.right = ticks_right * MillimeterFromTicks_Right; // ruota destra
+    f32 distance_left = ticks_left * MillimeterFromTicks_Left; // ruota sinistra
+    f32 distance_right = ticks_right * MillimeterFromTicks_Right; // ruota destra
+    state.distance_traveled.left += distance_left;
+    state.distance_traveled.right += distance_right;
 
     // calcolo ANGOLO
-    f32 delta_theta = -(state.distance_traveled.left - state.distance_traveled.right) / BASELINE_MM;
+    f32 delta_theta = -(distance_left - distance_right) / BASELINE_MM;
 
     // SOGLIA (ticks sinistra e destra mai esattamente uguali, anche se dritto)
     if (Abs(delta_theta) < THRESHOLD) {
       // movimento: DRITTO
       // calcolo matrice di ROTOTRASLAZIONE corrente
-      rt[0][0] = 1; rt[0][1] = 0; rt[0][2] = (state.distance_traveled.left + state.distance_traveled.right) / 2;
+      rt[0][0] = 1; rt[0][1] = 0; rt[0][2] = (distance_left + distance_right) / 2;
       rt[1][0] = 0; rt[1][1] = 1; rt[1][2] = 0;
       rt[2][0] = 0; rt[2][1] = 0; rt[2][2] = 1;
     } else {
       // movimento: CURVANDO
-      f32 d = (state.distance_traveled.right / delta_theta) - (BASELINE_MM / 2);
+      f32 d = (distance_right / delta_theta) - (BASELINE_MM / 2);
       // TRASLAZIONE al CIR
       t1[0][0] = 1; t1[0][1] = 0; t1[0][2] = 0;
       t1[1][0] = 0; t1[1][1] = 1; t1[1][2] = -d;
@@ -71,6 +76,10 @@ fn void odometry_task(void *_args) {
       state.pose.dof[0] = pose[0][2]; // posizione x
       state.pose.dof[1] = pose[1][2]; // posizione y
       state.pose.dof[2] = atan2(pose[1][0], pose[0][0]); // angolo theta
+
+#ifdef ENABLE_ODOMETRY_PRINT
+      Info("x: %fmm, y: %fmm, thetha: %f", state.pose.dof[0], state.pose.dof[1], state.pose.dof[2]);
+#endif
     }
 
     os_thread_cancelpoint();

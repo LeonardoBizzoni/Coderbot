@@ -53,4 +53,7 @@ elif [ -v clang ]; then printf "+ [ Clang "; fi
 
 if [ -v cpp ];   then printf "C++ "; else printf "C "; fi; printf "compilation ]\n"
 if [ -v debug ]; then echo "+ [ debug mode ]"; else echo "+ [ release mode ]"; fi
+if [ -v encoder ]; then flags+="-DENABLE_ENCODER_PRINT "; fi
+if [ -v odometry ]; then flags+="-DENABLE_ODOMETRY_PRINT "; fi
+if [ -v planner ]; then flags+="-DENABLE_PLANNER_PRINT "; fi
 (set -x; $compiler $file $flags $asan -o $outputf)

@@ -19,8 +19,8 @@ fn void deadline_handler(i32 sig) {
 global struct {
   struct {
     OS_Handle mutex;
-    u64 measured_left;
-    u64 measured_right;
+    i64 measured_left;
+    i64 measured_right;
   } tick;
   struct {
     f32 left;
@@ -82,7 +82,7 @@ void start(CmdLine *cmd) {
   OS_Handle odometry_thd = os_thread_start(odometry_task, 0);
   OS_Handle cartesian_thd = os_thread_start(cartesian_task, 0);
 
-  os_sleep_milliseconds(20 * 1e3);
+  os_sleep_milliseconds(4 * 1e3);
   os_thread_cancel(encoder_thd);
   os_thread_cancel(odometry_thd);
   os_thread_cancel(cartesian_thd);

@@ -25,7 +25,9 @@ fn void cb_encoder_callback_isrA(i32 gpio, i32 level, u32 tick, void *_enc) {
   enc->level_a = level;
   if(level ^ enc->level_b) {
     enc->direction = forward;
+    os_mutex_lock(state.tick.mutex);
     enc->ticks += forward;
+    os_mutex_unlock(state.tick.mutex);
   }
 }
 
@@ -36,6 +38,8 @@ fn void cb_encoder_callback_isrB(i32 gpio, i32 level, u32 tick, void *_enc) {
   enc->level_b = level;
   if(level ^ enc->level_a) {
     enc->direction = backward;
+    os_mutex_lock(state.tick.mutex);
     enc->ticks += backward;
+    os_mutex_unlock(state.tick.mutex);
   }
 }
