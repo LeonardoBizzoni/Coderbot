@@ -13,7 +13,7 @@ global f32 rt[3][3]   = {0}, // rototraslazione
 
 fn void odometry_task(void *_args) {
   //                     runtime ≤ deadline ≤ period
-  lnx_sched_set_deadline(2 * 1e9, 2 * 1e9, 2 * 1e9, deadline_handler);
+  lnx_sched_set_deadline(29 * 1e6, 30 * 1e6, 30 * 1e6, deadline_handler);
   /* Si questi valori di runtime/deadline/period sono a cazzo di cane
    * e si dobbiamo misurarli. */
 
@@ -67,8 +67,7 @@ fn void odometry_task(void *_args) {
     }
 
     // creazione VETTORE per POSE
-    os_mutex_lock(state.pose.mutex);
-    DeferLoop(os_mutex_unlock(state.pose.mutex)) {
+    DeferLoop(os_mutex_lock(state.pose.mutex), os_mutex_unlock(state.pose.mutex)) {
       state.pose.dof[0] = pose[0][2]; // posizione x
       state.pose.dof[1] = pose[1][2]; // posizione y
       state.pose.dof[2] = atan2(pose[1][0], pose[0][0]); // angolo theta
@@ -80,7 +79,7 @@ fn void odometry_task(void *_args) {
 }
 
 fn void moltiplica_matrici_3x3(f32 lhs[3][3], f32 rhs[3][3], f32 output[3][3]) {
-  memZero(output, sizeof(f32[3][3]));
+  memzero(output, sizeof(f32[3][3]));
   for (usize i = 0; i < 3; ++i) {
     for (usize j = 0; j < 3; ++j) {
       for (usize r = 0; r < 3; ++r) {

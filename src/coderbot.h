@@ -12,7 +12,7 @@
 #define BASELINE_MM 120.0
 
 // in mm/s
-#define TargetSpeed 7.0
+#define TargetSpeed 70.0
 
 #define MillimeterFromTicks_Left  0.1306443689
 #define MillimeterFromTicks_Right 0.1330557259

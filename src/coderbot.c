@@ -9,12 +9,12 @@ global cbMotor_t cb_motor_right =
   { PIN_RIGHT_FORWARD, PIN_RIGHT_BACKWARD, forward };
 
 fn void cb_stop(void) {
-  cbMotorReset(&cb_motor_left);
-  cbMotorReset(&cb_motor_right);
   gpioSetISRFuncEx(cb_encoder_left.pin_a, EITHER_EDGE, 1000, 0, 0);
   gpioSetISRFuncEx(cb_encoder_left.pin_b, EITHER_EDGE, 1000, 0, 0);
   gpioSetISRFuncEx(cb_encoder_right.pin_a, EITHER_EDGE, 1000, 0, 0);
   gpioSetISRFuncEx(cb_encoder_right.pin_b, EITHER_EDGE, 1000, 0, 0);
+  cbMotorReset(&cb_motor_left);
+  cbMotorReset(&cb_motor_right);
   gpioTerminate();
 }
 

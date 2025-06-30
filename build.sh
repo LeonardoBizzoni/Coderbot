@@ -2,7 +2,7 @@
 cd "$(dirname "$0")"
 set -eu
 
-make -C libcoderbot
+make -C libcoderbot clean all
 
 for arg in "$@"; do
     if [[ $arg == *=* ]]; then
@@ -29,7 +29,7 @@ no_annoying_cpp_warnings=""
 asan="-fsanitize=address,undefined"
 
 opt_flags="-O3 -s"
-dbg_flags="-DENABLE_ASSERT=1 -DDEBUG=1"
+dbg_flags="-ggdb -O0 -DENABLE_ASSERT=1 -DDEBUG=1"
 
 cpp_mode="-std=c++23 -fno-exceptions"
 
@@ -53,4 +53,4 @@ elif [ -v clang ]; then printf "+ [ Clang "; fi
 
 if [ -v cpp ];   then printf "C++ "; else printf "C "; fi; printf "compilation ]\n"
 if [ -v debug ]; then echo "+ [ debug mode ]"; else echo "+ [ release mode ]"; fi
-(set -x; $compiler $file $flags -o $outputf)
+(set -x; $compiler $file $flags $asan -o $outputf)

@@ -1,7 +1,6 @@
 fn void encoder_task(void *_args) {
   i64 period_ms = 20;
-  lnx_sched_set_deadline((period_ms - 1) * 1e6, (period_ms - 1) * 1e6,
-                         period_ms * 1e6, deadline_handler);
+  lnx_sched_set_deadline((period_ms - 1) * 1e6, period_ms * 1e6, period_ms * 1e6, deadline_handler);
 
   for (;;) {
     os_mutex_lock(state.speed.mutex);
@@ -33,16 +32,16 @@ fn void encoder_task(void *_args) {
     duty_cycle_left = Kp_Left * delta_left + Ki_Left * accumalated_error_left;
     duty_cycle_right = Kp_Right * delta_right + Ki_Right * accumalated_error_right;
 
-    printf("Left:\n\ttarget ticks: %ld\n\tmeasured ticks: %ld\n\tdelta: %ld"
-           "\n\taccumulated error: %ld\n\taccumulated error average: %lf"
-           "\n\tduty cycle uncapped: %lf\n",
-           target_ticks_left, cb_encoder_left.ticks, delta_left, accumalated_error_left,
-           (f32)accumalated_error_left / (f32)activations, duty_cycle_left);
-    printf("Right:\n\ttarget ticks: %ld\n\tmeasured ticks: %ld\n\tdelta: %ld"
-           "\n\taccumulated error: %ld\n\taccumulated error average: %lf"
-           "\n\tduty cycle uncapped: %lf\n",
-           target_ticks_right, cb_encoder_right.ticks, delta_right, accumalated_error_right,
-           (f32)accumalated_error_right / (f32)activations, duty_cycle_right);
+    /* printf("Left:\n\ttarget ticks: %ld\n\tmeasured ticks: %ld\n\tdelta: %ld" */
+    /*        "\n\taccumulated error: %ld\n\taccumulated error average: %lf" */
+    /*        "\n\tduty cycle uncapped: %lf\n", */
+    /*        target_ticks_left, cb_encoder_left.ticks, delta_left, accumalated_error_left, */
+    /*        (f32)accumalated_error_left / (f32)activations, duty_cycle_left); */
+    /* printf("Right:\n\ttarget ticks: %ld\n\tmeasured ticks: %ld\n\tdelta: %ld" */
+    /*        "\n\taccumulated error: %ld\n\taccumulated error average: %lf" */
+    /*        "\n\tduty cycle uncapped: %lf\n", */
+    /*        target_ticks_right, cb_encoder_right.ticks, delta_right, accumalated_error_right, */
+    /*        (f32)accumalated_error_right / (f32)activations, duty_cycle_right); */
 
     motor_direction_left = duty_cycle_left < 0 ? backward : forward;
     motor_direction_right = duty_cycle_right < 0 ? backward : forward;
@@ -52,8 +51,8 @@ fn void encoder_task(void *_args) {
     duty_cycle_left = Clamp(Abs(duty_cycle_left), 0.1, 0.6);
     duty_cycle_right = Clamp(Abs(duty_cycle_right), 0.1, 0.6);
 
-    printf("Left duty cycle will be: %lf\n", duty_cycle_left);
-    printf("Right duty cycle will be: %lf\n\n", duty_cycle_right);
+    /* printf("Left duty cycle will be: %lf\n", duty_cycle_left); */
+    /* printf("Right duty cycle will be: %lf\n\n", duty_cycle_right); */
 
     cb_encoder_left.ticks = 0;
     cb_encoder_right.ticks = 0;

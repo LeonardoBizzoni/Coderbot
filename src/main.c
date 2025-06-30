@@ -35,6 +35,8 @@ global struct {
     f32 left;
     f32 right;
   } speed;
+
+  Points waypoints[N_POINTS];
 } state = {0};
 
 #include "coderbot.c"
@@ -42,14 +44,17 @@ global struct {
 #include "encoder.c"
 #include "cartesian_controller.c"
 
-// task: cartesian controller (local planner)
-// task: controllo encoder
-// task: odometria
-
 void start(CmdLine *cmd) {
   state.tick.mutex = os_mutex_alloc();
   state.pose.mutex = os_mutex_alloc();
   state.speed.mutex = os_mutex_alloc();
+
+  state.speed.left = TargetSpeed;
+  state.speed.right = TargetSpeed;
+
+  // creazione TRAIETTORIA come SUCCESSIONE di PUNTI nel PIANO CARTESIANO
+  // centrato in (0cm, -90cm), raggio: 90cm, circonferenza considerata da 0° a 90°
+  generate_arc_points(0, -900, 900, 0.f, 90.f);
 
   i32 version = gpioInitialise();
   if (version < 0) {
@@ -77,9 +82,12 @@ void start(CmdLine *cmd) {
   OS_Handle odometry_thd = os_thread_start(odometry_task, 0);
   OS_Handle cartesian_thd = os_thread_start(cartesian_task, 0);
 
-  os_sleep_milliseconds(4 * 1e3);
+  os_sleep_milliseconds(20 * 1e3);
   os_thread_cancel(encoder_thd);
   os_thread_cancel(odometry_thd);
   os_thread_cancel(cartesian_thd);
+
+  Info("Terminated calling `cb_stop`");
   cb_stop();
+  Info("Finished `cb_stop`");
 }
