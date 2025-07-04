@@ -24,6 +24,8 @@ fn void odometry_task(void *_args) {
     os_mutex_lock(state.tick.mutex);
     i64 ticks_left = state.tick.measured_left;
     i64 ticks_right = state.tick.measured_right;
+    state.tick.measured_left = 0;
+    state.tick.measured_right = 0;
     os_mutex_unlock(state.tick.mutex);
 
     /* ODOMETRIA */
@@ -52,8 +54,8 @@ fn void odometry_task(void *_args) {
       t1[2][0] = 0; t1[2][1] = 0; t1[2][2] = 1;
       // ROTAZIONE
       r[0][0] = cos(delta_theta); r[0][1] = -sin(delta_theta); r[0][2] = 0;
-      r[1][0] = sin(delta_theta); r[1][1] = cos(delta_theta); r[1][2] = 0;
-      r[2][0] = 0; r[2][1] = 0; r[2][2] = 1;
+      r[1][0] = sin(delta_theta); r[1][1] = cos(delta_theta);  r[1][2] = 0;
+      r[2][0] = 0;                r[2][1] = 0;                 r[2][2] = 1;
       // TRASLAZIONE dal CIR
       t2[0][0] = 1; t2[0][1] = 0; t2[0][2] = 0;
       t2[1][0] = 0; t2[1][1] = 1; t2[1][2] = d;
@@ -65,11 +67,7 @@ fn void odometry_task(void *_args) {
 
     // calcolo (nuova) POSE
     moltiplica_matrici_3x3(pose, rt, new_pose);
-    for (usize r = 0; r < 3; r++) {
-      for (usize c = 0; c < 3; c++) {
-        pose[r][c] = new_pose[r][c];
-      }
-    }
+    memcopy(pose, new_pose, sizeof(f32[3][3]));
 
     // creazione VETTORE per POSE
     DeferLoop(os_mutex_lock(state.pose.mutex), os_mutex_unlock(state.pose.mutex)) {
@@ -78,7 +76,7 @@ fn void odometry_task(void *_args) {
       state.pose.dof[2] = atan2(pose[1][0], pose[0][0]); // angolo theta
 
 #ifdef ENABLE_ODOMETRY_PRINT
-      Info("x: %fmm, y: %fmm, thetha: %f", state.pose.dof[0], state.pose.dof[1], state.pose.dof[2]);
+      Log("x: %fmm, y: %fmm, thetha: %f", state.pose.dof[0], state.pose.dof[1], state.pose.dof[2]);
 #endif
     }
 
@@ -89,11 +87,15 @@ fn void odometry_task(void *_args) {
 
 fn void moltiplica_matrici_3x3(f32 lhs[3][3], f32 rhs[3][3], f32 output[3][3]) {
   memzero(output, sizeof(f32[3][3]));
-  for (usize i = 0; i < 3; ++i) {
-    for (usize j = 0; j < 3; ++j) {
-      for (usize r = 0; r < 3; ++r) {
-        output[i][j] += lhs[i][r] * rhs[r][j];
-      }
-    }
-  }
+  output[0][0] = (lhs[0][0] * rhs[0][0]) + (lhs[0][1] * rhs[1][0]) + (lhs[0][2] * rhs[2][0]);
+  output[0][1] = (lhs[0][0] * rhs[0][1]) + (lhs[0][1] * rhs[1][1]) + (lhs[0][2] * rhs[2][1]);
+  output[0][2] = (lhs[0][0] * rhs[0][2]) + (lhs[0][1] * rhs[1][2]) + (lhs[0][2] * rhs[2][2]);
+
+  output[1][0] = (lhs[1][0] * rhs[0][0]) + (lhs[1][1] * rhs[1][0]) + (lhs[1][2] * rhs[2][0]);
+  output[1][1] = (lhs[1][0] * rhs[0][1]) + (lhs[1][1] * rhs[1][1]) + (lhs[1][2] * rhs[2][1]);
+  output[1][2] = (lhs[1][0] * rhs[0][2]) + (lhs[1][1] * rhs[1][2]) + (lhs[1][2] * rhs[2][2]);
+
+  output[2][0] = (lhs[2][0] * rhs[0][0]) + (lhs[2][1] * rhs[1][0]) + (lhs[2][2] * rhs[2][0]);
+  output[2][1] = (lhs[2][0] * rhs[0][1]) + (lhs[2][1] * rhs[1][1]) + (lhs[2][2] * rhs[2][1]);
+  output[2][2] = (lhs[2][0] * rhs[0][2]) + (lhs[2][1] * rhs[1][2]) + (lhs[2][2] * rhs[2][2]);
 }

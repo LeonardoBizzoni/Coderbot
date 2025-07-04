@@ -24,7 +24,7 @@ fi
 
 links="-lpigpio -lpthread -lm -lrt -I./src/base -I."
 common_flags="-pedantic -Wall -Werror -DPLATFORM_CODERBOT"
-no_annoying_warnings="-Wno-unused-function -Wno-initializer-overrides"
+no_annoying_warnings="-Wno-unused-function -Wno-strict-aliasing"
 no_annoying_cpp_warnings=""
 asan="-fsanitize=address,undefined"
 
