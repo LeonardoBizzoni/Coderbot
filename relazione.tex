@@ -1,4 +1,4 @@
-% Created 2025-07-04 Fri 14:23
+% Created 2025-07-07 Mon 10:09
 % Intended LaTeX compiler: pdflatex
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
@@ -29,7 +29,7 @@
 \tableofcontents
 
 \section{Trasformazione delle letture encoder in lunghezze degli archi percorsi}
-\label{sec:orgcf6fb9b}
+\label{sec:org4604f05}
 L'ottenimento dei tick misurati da entrambi gli encoder, sinitro e destro, viene fatto tramite le 2 istanze di `cbEncoder\textsubscript{t}`:
 \begin{verbatim}
 cbEncoder_t cb_encoder_left = { PIN_ENCODER_LEFT_A, PIN_ENCODER_LEFT_B, -1 };
@@ -63,7 +63,7 @@ distanza percorsa & tick encoder\textsubscript{sinistro} & tick encoder destro\\
 
 Come costanti di conversione abbiamo utilizzato le 2 medie (\emph{MillimeterFromTicks\textsubscript{Left}, MillimeterFromTicks\textsubscript{Right}}) le quali sono misurate in millimetri su tick.
 \section{Ciclo di controllo delle ruote}
-\label{sec:org3f027c6}
+\label{sec:org1bd33ff}
 Il controllo delle ruote inizia leggendo il valore di velocità delle singole ruote impostato dalla task di controllo cartesiano. Questa lettura viene effettuata in sezione critica per evitare corse critiche dove la task di controllo cartesiano sovrascrive il valore di velocità mentre la task di controllo ruote cerca di leggerlo:
 \begin{verbatim}
 os_mutex_lock(state.speed.mutex);
@@ -120,9 +120,9 @@ cbMotorMove(&cb_motor_right, motor_direction_right, duty_cycle_right);
 Trovare i valori delle costanti `Kp\textsubscript{Left}`, `Kp\textsubscript{Right}`, `Ki\textsubscript{Left}`, `Ki\textsubscript{Right}` è anchesso stato fatto in maniera sperimentale separatamente.
 Per le costanti proporzionali si è cercato di trovarle andado a modificarle leggermente ad ogni esecuzione del programma cercando di aggiustarle per far andare il coderbot dritto. Una volta trovate queste, si è passati alle costanti integrali che, analogamente, sono state regolate gradualmente con l'obiettivo di ridurre il delta tra i tick desiderati e tick misurati.
 \section{Odometria}
-\label{sec:orgf92f562}
+\label{sec:orge318f63}
 \subsection{Rappresentazione delle pose del robot}
-\label{sec:org5b5d30e}
+\label{sec:orga4cc6c3}
 \begin{center}
 \includegraphics[width=300]{/home/leo/Pictures/coderbot-graph.jpg}
 \end{center}
@@ -134,7 +134,7 @@ La pose del coderbot (\emph{la sua rotazione e posizione corrente}) viene modell
 \item \(\bold P\) è il vettore che indica la posizione del coderbot rispetto all'origine del sistema di riferimento attaccato al corpo del coderbot.
 \end{itemize}
 \subsection{Comporamente della task periodica}
-\label{sec:orgd742f41}
+\label{sec:org69cb57c}
 Nella task di odometria vengono letti i tick misurati dagli encoder e, grazie alle costanti di conversione da tick a millimetri, si ottiene la distanza percorsa dal coderbot nel tempo percorso tra l'attivazione precedente e quella corrente della task di odometria:
 \begin{verbatim}
 f32 distance_left = ticks_left * MillimeterFromTicks_Left;
@@ -146,17 +146,26 @@ Sapendo la distanza percorsa dalle 2 ruote e la distanza tra di esse è possibil
 f32 delta_theta = -(distance_left - distance_right) / BASELINE_MM;
 \end{verbatim}
 Per rispettare la convenzione secondo cui le rotazioni in senso antiorario hanno segno positivo, viene invertito il segno dell'angolo.
-
-\begin{center}
-\rule[1ex]{.5\textwidth}{.5pt}
-\end{center}
-
+\subsubsection{Traiettoria rettilinea}
+\label{sec:orgddcda78}
 Se l'angolo \(\theta\) è minore di una certa soglia, da noi fissata a \(0.005\text{rad}\), allora dato che la rotazione misurata è prossochè nulla, possiamo approssimare il movimento ad una linea retta lungo l'asse delle \(X\) con modulo uguale alla media delle distanze percorse dalle 2 ruote.
 L'operazione da applicare alla pose attuale del coderbot sarà una semplice traslazione lungo l'asse delle X, \(\text{pose}=\text{pose}\cdot\begin{bmatrix}R&P\\0^T&1\end{bmatrix}\) dove:
 \begin{itemize}
 \item \(R=I_2=\begin{bmatrix}1&0\\0&1\end{bmatrix}\)
 \item \(P= \begin{bmatrix}(\text{distance left} - \text{distance right})/2\\0\end{bmatrix}\)
 \end{itemize}
+\subsubsection{Traiettoria curviliena}
+\label{sec:orgc2bf1e1}
+Se l'angolo \(\theta\) è maggiore della soglia, questo indica che il coderbot sta effettivamente compiendo un movimento curvilineo, ruotando attorno a un centro di istantanea rotazione (\emph{CIR}). Questo CIR si trova lungo \(Y\) del sistema di riferimento del coderbot, ma traslato di una certa distanza `d`.
+Il valore di `d` è dato dalla lunghezza dell'arco percorso da una delle 2 ruote, noi abbiamo deciso di considerare la ruota destra, diviso per l'angolo di rotazione. Dato che la lunghezza dell'arco è relativa alla ruota destra, è necessario sottrarre metà baseline per effettuare la traslazione rispetto al centro del coderbot:
+\begin{verbatim}
+f32 d = (distance_right / delta_theta) - (BASELINE_MM / 2);
+\end{verbatim}
 
-Viceversa, se l'angolo \(\theta\) è maggiore della soglia, questo indica che il coderbot sta effettivamente curvando rispetto a un centro di istantanea rotazione (\emph{anche detto CIR}).
+Per aggiornare la pose del coderbot, è stata applicata una rototraslazione `rt` ottenuta attraverso i seguenti passaggi:
+\begin{itemize}
+\item rotazione della matrice \(\text{t1}= \begin{bmatrix}1&0&0\\0&1&-d\\0&0&1\end{bmatrix}\), ovvero la matrice che esprime la posizione del CIR rispetto alla pose attuale del coderbot, di un angolo \(\theta\) rispetto l'asse Z del sistema di riferimento \emph{world}: \(R_z(\theta)\cdot\text{t1}\). Moltiplicando la pose del coderbot per questa matrice intermedia \(\text{pose}\cdot (R_z(\theta)\cdot\text{t1})\) stiamo allineando il coderbot con il CIR e vi stiamo applicando una rotazione rispetto l'asse Z.
+\item applicazione di una traslazione inversa per riportare il coderbot alla posizione originale tramite moltiplicazione della matrice intermedia per \(\text{t2}= \begin{bmatrix}1&0&0\\0&1&d\\0&0&1\end{bmatrix}\), anch'essa definita nel sistema \emph{world}: \(\text{rt}=\text{t2}\cdot R_z(\theta)\cdot\text{t1}\).
+\end{itemize}
+Infine, la nuova pose del robot nel sistema \emph{body} è ottenuta applicando la rototraslazione `rt` alla pose corrente: \(\text{new pose} = \text{pose}\cdot\text{rt}\).
 \end{document}

@@ -108,13 +108,20 @@ f32 delta_theta = -(distance_left - distance_right) / BASELINE_MM;
 #+end_src
 Per rispettare la convenzione secondo cui le rotazioni in senso antiorario hanno segno positivo, viene invertito il segno dell'angolo.
 
-#+begin_center
-\rule[1ex]{.5\textwidth}{.5pt}
-#+end_center
-
+*** Traiettoria rettilinea
 Se l'angolo $\theta$ è minore di una certa soglia, da noi fissata a $0.005\text{rad}$, allora dato che la rotazione misurata è prossochè nulla, possiamo approssimare il movimento ad una linea retta lungo l'asse delle $X$ con modulo uguale alla media delle distanze percorse dalle 2 ruote.
 L'operazione da applicare alla pose attuale del coderbot sarà una semplice traslazione lungo l'asse delle X, $\text{pose}=\text{pose}\cdot\begin{bmatrix}R&P\\0^T&1\end{bmatrix}$ dove:
 - $R=I_2=\begin{bmatrix}1&0\\0&1\end{bmatrix}$
 - $P= \begin{bmatrix}(\text{distance left} - \text{distance right})/2\\0\end{bmatrix}$
 
-Viceversa, se l'angolo $\theta$ è maggiore della soglia, questo indica che il coderbot sta effettivamente curvando rispetto a un centro di istantanea rotazione (/anche detto CIR/).
+*** Traiettoria curviliena
+Se l'angolo $\theta$ è maggiore della soglia, questo indica che il coderbot sta effettivamente compiendo un movimento curvilineo, ruotando attorno a un centro di istantanea rotazione (/CIR/). Questo CIR si trova lungo $Y$ del sistema di riferimento del coderbot, ma traslato di una certa distanza `d`.
+Il valore di `d` è dato dalla lunghezza dell'arco percorso da una delle 2 ruote, noi abbiamo deciso di considerare la ruota destra, diviso per l'angolo di rotazione. Dato che la lunghezza dell'arco è relativa alla ruota destra, è necessario sottrarre metà baseline per effettuare la traslazione rispetto al centro del coderbot:
+#+begin_src c
+f32 d = (distance_right / delta_theta) - (BASELINE_MM / 2);
+#+end_src
+
+Per aggiornare la pose del coderbot, è stata applicata una rototraslazione `rt` ottenuta attraverso i seguenti passaggi:
+- rotazione della matrice $\text{t1}= \begin{bmatrix}1&0&0\\0&1&-d\\0&0&1\end{bmatrix}$, ovvero la matrice che esprime la posizione del CIR rispetto alla pose attuale del coderbot, di un angolo $\theta$ rispetto l'asse Z del sistema di riferimento /world/: $R_z(\theta)\cdot\text{t1}$. Moltiplicando la pose del coderbot per questa matrice intermedia $\text{pose}\cdot (R_z(\theta)\cdot\text{t1})$ stiamo allineando il coderbot con il CIR e vi stiamo applicando una rotazione rispetto l'asse Z.
+- applicazione di una traslazione inversa per riportare il coderbot alla posizione originale tramite moltiplicazione della matrice intermedia per $\text{t2}= \begin{bmatrix}1&0&0\\0&1&d\\0&0&1\end{bmatrix}$, anch'essa definita nel sistema /world/: $\text{rt}=\text{t2}\cdot R_z(\theta)\cdot\text{t1}$.
+Infine, la nuova pose del robot nel sistema /body/ è ottenuta applicando la rototraslazione `rt` alla pose corrente: $\text{new pose} = \text{pose}\cdot\text{rt}$.
