@@ -1,6 +1,7 @@
+global i32 chunk = 0;
+
 fn void generate_arc_points(f32 center_x, f32 center_y, f32 radius,
                             f32 start_angle, f32 end_angle) {
-  local i32 chunk = 0;
   f32 start_radians = start_angle * M_PI / 180.f;
   f32 end_radians = end_angle * M_PI / 180.f;
   for (i32 i = 0; i < N_POINTS; ++i) {
@@ -12,11 +13,14 @@ fn void generate_arc_points(f32 center_x, f32 center_y, f32 radius,
   chunk += 1;
 }
 
-fn void generate_line_points(f32 length_mm) {
+fn void generate_line_points(f32 start_x, f32 start_y, f32 length_mm, f32 angle) {
+  f32 radians = angle * M_PI / 180.f;
   for (i32 i = 0; i < N_POINTS; ++i) {
-    state.waypoints[i].x = ClampTop(i * (length_mm / N_POINTS), length_mm);
-    state.waypoints[i].y = 0.f;
+    f32 amount = ClampTop(i * (length_mm / N_POINTS), length_mm);
+    state.waypoints[i + chunk * N_POINTS].x = start_x + amount * cosf(radians);
+    state.waypoints[i + chunk * N_POINTS].y = start_y + amount * sinf(radians);;
   }
+  chunk += 1;
 }
 
 fn i32 nearest_point_position(f32 *pose_dof) {
@@ -36,6 +40,7 @@ fn i32 nearest_point_position(f32 *pose_dof) {
   return nearest_index;
 }
 
+#if PLATFORM_CODERBOT
 fn void cartesian_task(void *_args) {
   lnx_sched_set_deadline(2 * 1e6, 30 * 1e6, 30 * 1e6, deadline_handler);
   for (;;) {
@@ -94,3 +99,4 @@ fn void cartesian_task(void *_args) {
     lnx_sched_yield();
   }
 }
+#endif

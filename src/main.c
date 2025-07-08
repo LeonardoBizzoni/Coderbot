@@ -36,7 +36,7 @@ global struct {
     f32 right;
   } speed;
 
-  Points waypoints[N_POINTS];
+  Points waypoints[N_POINTS * 2];
 } state = {0};
 
 #include "coderbot.c"
@@ -54,7 +54,14 @@ void start(CmdLine *cmd) {
 
   // creazione TRAIETTORIA come SUCCESSIONE di PUNTI nel PIANO CARTESIANO
   // centrato in (0cm, -90cm), raggio: 90cm, circonferenza considerata da 0° a 90°
-  generate_arc_points(0, -900, 900, 0.f, 90.f);
+
+  /* generate_line_points(0, 0, 236, 0); */
+
+  // girare a sinistra
+  generate_arc_points(0, 900, 900, -90.f, 0.f);
+
+  // girare a destra
+  generate_arc_points(180, -900, 900, 90.f, 0.f);
 
   i32 version = gpioInitialise();
   if (version < 0) {
@@ -82,7 +89,7 @@ void start(CmdLine *cmd) {
   OS_Handle odometry_thd = os_thread_start(odometry_task, 0);
   OS_Handle cartesian_thd = os_thread_start(cartesian_task, 0);
 
-  /* os_sleep_milliseconds(4 * 1e3); */
+  /* os_sleep_milliseconds(10 * 1e3); */
   lnx_signal_wait(SIGUSR1);
 
   os_thread_cancel(encoder_thd);
