@@ -9,4 +9,8 @@ typedef struct {
   f32 x, y;
 } Points;
 
+fn void generate_arc_points(f32 center_x, f32 center_y, f32 radius,
+                            f32 start_angle, f32 end_angle);
+fn i32 nearest_point_position(f32 *pose_dof);
+
 #endif

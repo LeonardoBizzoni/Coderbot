@@ -12,10 +12,7 @@ global f32 rt[3][3]   = {0}, // rototraslazione
            temp[3][3] = {0}; // temporanea
 
 fn void odometry_task(void *_args) {
-  //                     runtime ≤ deadline ≤ period
-  lnx_sched_set_deadline(29 * 1e6, 30 * 1e6, 30 * 1e6, deadline_handler);
-  /* Si questi valori di runtime/deadline/period sono a cazzo di cane
-   * e si dobbiamo misurarli. */
+  lnx_sched_set_deadline(2 * 1e6, 30 * 1e6, 30 * 1e6, deadline_handler);
 
   state.distance_traveled.left = 0;
   state.distance_traveled.right = 0;
@@ -76,7 +73,7 @@ fn void odometry_task(void *_args) {
       state.pose.dof[2] = atan2(pose[1][0], pose[0][0]); // angolo theta
 
 #ifdef ENABLE_ODOMETRY_PRINT
-      Log("x: %fmm, y: %fmm, thetha: %f", state.pose.dof[0], state.pose.dof[1], state.pose.dof[2]);
+      printf("(%f, %f), ", state.pose.dof[0], state.pose.dof[1]);
 #endif
     }
 

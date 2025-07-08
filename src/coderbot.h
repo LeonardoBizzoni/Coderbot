@@ -12,7 +12,7 @@
 #define BASELINE_MM 120.0
 
 // in mm/s
-#define TargetSpeed 50.0
+#define TargetSpeed 70.0
 
 #define Duty_CycleFromTicks_Left  0.5469512
 #define Duty_CycleFromTicks_Right 0.1771385

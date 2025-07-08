@@ -1,16 +1,22 @@
 fn void generate_arc_points(f32 center_x, f32 center_y, f32 radius,
                             f32 start_angle, f32 end_angle) {
+  local i32 chunk = 0;
   f32 start_radians = start_angle * M_PI / 180.f;
   f32 end_radians = end_angle * M_PI / 180.f;
-  for (i32 i = 0, j = N_POINTS - 1;
-       i < N_POINTS && j >= 0;
-       ++i, --j)
-    {
-      f32 t = (f32)i / (N_POINTS - 1);
-      f32 radians = start_radians + t * (end_radians - start_radians);
-      state.waypoints[j].x = center_x + radius * cosf(radians);
-      state.waypoints[j].y = center_y + radius * sinf(radians);
-    }
+  for (i32 i = 0; i < N_POINTS; ++i) {
+    f32 t = (f32)i / (N_POINTS - 1);
+    f32 radians = start_radians + t * (end_radians - start_radians);
+    state.waypoints[i + chunk * N_POINTS].x = center_x + radius * cosf(radians);
+    state.waypoints[i + chunk * N_POINTS].y = center_y + radius * sinf(radians);
+  }
+  chunk += 1;
+}
+
+fn void generate_line_points(f32 length_mm) {
+  for (i32 i = 0; i < N_POINTS; ++i) {
+    state.waypoints[i].x = ClampTop(i * (length_mm / N_POINTS), length_mm);
+    state.waypoints[i].y = 0.f;
+  }
 }
 
 fn i32 nearest_point_position(f32 *pose_dof) {
@@ -31,7 +37,7 @@ fn i32 nearest_point_position(f32 *pose_dof) {
 }
 
 fn void cartesian_task(void *_args) {
-  lnx_sched_set_deadline(29 * 1e6, 30 * 1e6, 30 * 1e6, deadline_handler);
+  lnx_sched_set_deadline(2 * 1e6, 30 * 1e6, 30 * 1e6, deadline_handler);
   for (;;) {
     /* CARTESIAN CONTROLLER */
     // POSIZIONE CORRENTE REALE (da odometria) APPROSSIMATA AL PUNTO della TRAIETTORIA PIU' VICINO
