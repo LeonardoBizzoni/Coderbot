@@ -1,48 +1,26 @@
-global i32 chunk = 0;
-
-fn void generate_arc_points(f32 center_x, f32 center_y, f32 radius,
-                            f32 start_angle, f32 end_angle) {
-  f32 start_radians = start_angle * M_PI / 180.f;
-  f32 end_radians = end_angle * M_PI / 180.f;
-  for (i32 i = 0; i < N_POINTS; ++i) {
-    f32 t = (f32)i / (N_POINTS - 1);
-    f32 radians = start_radians + t * (end_radians - start_radians);
-    state.waypoints[i + chunk * N_POINTS].x = center_x + radius * cosf(radians);
-    state.waypoints[i + chunk * N_POINTS].y = center_y + radius * sinf(radians);
-  }
-  chunk += 1;
-}
-
-fn void generate_line_points(f32 start_x, f32 start_y, f32 length_mm, f32 angle) {
-  f32 radians = angle * M_PI / 180.f;
-  for (i32 i = 0; i < N_POINTS; ++i) {
-    f32 amount = ClampTop(i * (length_mm / N_POINTS), length_mm);
-    state.waypoints[i + chunk * N_POINTS].x = start_x + amount * cosf(radians);
-    state.waypoints[i + chunk * N_POINTS].y = start_y + amount * sinf(radians);;
-  }
-  chunk += 1;
-}
-
-fn i32 nearest_point_position(f32 *pose_dof) {
-  f32 min_distance_squared = (state.waypoints[0].x - pose_dof[0]) * (state.waypoints[0].x - pose_dof[0]) +
-                             (state.waypoints[0].y - pose_dof[1]) * (state.waypoints[0].y - pose_dof[1]);
-  i32 nearest_index = 0;
-  for (i32 i = 1; i < N_POINTS; ++i) {
-    f32 dx = state.waypoints[i].x - pose_dof[0];
-    f32 dy = state.waypoints[i].y - pose_dof[1];
+fn i32 nearest_point_position(f32 *pose_dof, i32 last_idx) {
+  i32 nearest = last_idx;
+  f32 min_distance_squared = INFINITY;
+  for (i32 i = ClampBot(0, last_idx - WAYPOINTS_WINDOW);
+       i < ClampTop(N_POINTS, last_idx + WAYPOINTS_WINDOW);
+       ++i) {
+    f32 dx = waypoints[i].x - pose_dof[0];
+    f32 dy = waypoints[i].y - pose_dof[1];
     f32 distance_squared = dx * dx + dy * dy;
     if (distance_squared < min_distance_squared) {
       min_distance_squared = distance_squared;
-      nearest_index = i;
+      nearest = i;
     }
   }
 
-  return nearest_index;
+  return nearest;
 }
 
 #if PLATFORM_CODERBOT
 fn void cartesian_task(void *_args) {
   lnx_sched_set_deadline(2 * 1e6, 30 * 1e6, 30 * 1e6, deadline_handler);
+  i32 last_nearest_idx = 0;
+
   for (;;) {
     /* CARTESIAN CONTROLLER */
     // POSIZIONE CORRENTE REALE (da odometria) APPROSSIMATA AL PUNTO della TRAIETTORIA PIU' VICINO
@@ -53,7 +31,8 @@ fn void cartesian_task(void *_args) {
       memcopy(pose, state.pose.dof, sizeof(pose));
     }
 
-    i32 current_position = nearest_point_position(pose);
+    i32 current_position = nearest_point_position(pose, last_nearest_idx);
+    last_nearest_idx = current_position;
     if(current_position >= N_POINTS - 3) {
       Info("Trajectory finished");
       DeferLoop(os_mutex_lock(state.speed.mutex), os_mutex_unlock(state.speed.mutex)) {
@@ -66,8 +45,8 @@ fn void cartesian_task(void *_args) {
 
     // waypoints[current_position + 3] POSIZIONE che si PUNTA (per evitare errori, non troppo vicina, quindi +3 posizioni)
     // waypoints[current_position].XY POSIZIONE CORRENTE REALE (da odometria) APPROSSIMATA AL PUNTO della TRAIETTORIA PIU' VICINO
-    f32 delta_x = state.waypoints[current_position + 3].x - state.waypoints[current_position].x;
-    f32 delta_y = state.waypoints[current_position + 3].y - state.waypoints[current_position].y;
+    f32 delta_x = waypoints[current_position + 3].x - waypoints[current_position].x;
+    f32 delta_y = waypoints[current_position + 3].y - waypoints[current_position].y;
     f32 desired_theta = atan2(delta_y, delta_x);
     f32 delta_theta_c = desired_theta - pose[2]; // errore dell'angolo
 

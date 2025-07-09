@@ -1,17 +1,19 @@
 #+TITLE: Relazione Laboratori Coderbot
-#+SUBTITLE: Gruppo: Leonardo Bizzoni (899629) - Camilla Cantaluppi (894557) - altri?
-#+AUTHOR: Leonardo Bizzoni
+#+AUTHOR: Leonardo Bizzoni (899629) - Camilla Cantaluppi (894557) - Fabio Lo Presti (xxxxxx)
 
 * Trasformazione delle letture encoder in lunghezze degli archi percorsi
-L'ottenimento dei tick misurati da entrambi gli encoder, sinitro e destro, viene fatto tramite le 2 istanze di `cbEncoder_t`:
+L'ottenimento dei tick misurati da entrambi gli encoder, sinitro e destro, viene fatto tramite le 2 istanze di `cbEncoder_t` e leggendo il valore del parametro `ticks` periodicamente:
 #+begin_src c
 cbEncoder_t cb_encoder_left = { PIN_ENCODER_LEFT_A, PIN_ENCODER_LEFT_B, -1 };
 cbEncoder_t cb_encoder_right = { PIN_ENCODER_RIGHT_A, PIN_ENCODER_RIGHT_B, -1};
 #+end_src
-e leggendo il valore del parametro `ticks`.
 
-La conversione del valore in tick al suo corrispondente in millimetri percorsi viene fatto grazie a 2 variabili di conversione (/una per encoder/) misurante in millimetri/tick.
-Queste 2 variabili sono state trovate sperimentalmente cercando di far andare il coderbot in linea retta per un albitrario intervallo di tempo e misurando la distanza percorsa con un metro e osservando quanti tick erano stati misurati dai 2 encoder. Dopo aver ripetuto l'esperimento 6 volte questi sono i risultati ottenuti:
+I parametri di queste 2 strutture vengono aggiornati tramite due funzioni callback `cb_encoder_callback_isrA` e `cb_encoder_callback_isrB` che vengono invocate quando il rispettivo canale, `A` o `B`, dell'encoder invia un interrupt per segnalare il cambiamento di livello (/rising o falling edge/).
+
+[[file:./img/enc-chan.gif]]
+
+La conversione del valore in tick al suo corrispondente in millimetri percorsi viene fatto grazie a 2 costanti di conversione (/una per encoder/) misurante in millimetri/tick.
+Queste 2 costanti sono state trovate sperimentalmente cercando di far andare il coderbot in linea retta per un albitrario intervallo di tempo e misurando la distanza percorsa con un metro e osservando quanti tick erano stati misurati dai 2 encoder. Dopo aver ripetuto l'esperimento questi sono i risultati ottenuti:
 | distanza percorsa | tick encoder_sinistro | tick encoder destro |
 |-------------------+-----------------------+---------------------|
 | 91mm              |                   828 |                 832 |
@@ -28,7 +30,7 @@ Queste 2 variabili sono state trovate sperimentalmente cercando di far andare il
 - Deviazione standard tick encoder sinistro: 0.003798618023868534
 - Deviazione standard tick encoder destro:   0.0019415495430565542
 
-Come costanti di conversione abbiamo utilizzato le 2 medie (/MillimeterFromTicks_Left, MillimeterFromTicks_Right/) le quali sono misurate in millimetri su tick.
+Come costanti di conversione abbiamo utilizzato le 2 medie (/MillimeterFromTicks_Left, MillimeterFromTicks_Right/).
 
 * Ciclo di controllo delle ruote
 Il controllo delle ruote inizia leggendo il valore di velocità delle singole ruote impostato dalla task di controllo cartesiano. Questa lettura viene effettuata in sezione critica per evitare corse critiche dove la task di controllo cartesiano sovrascrive il valore di velocità mentre la task di controllo ruote cerca di leggerlo:
@@ -38,21 +40,14 @@ os_mutex_lock(state.speed.mutex);
 f32 target_ticksXsec_left = state.speed.left / MillimeterFromTicks_Left;
 f32 target_ticksXsec_right = state.speed.right / MillimeterFromTicks_Right;
 os_mutex_unlock(state.speed.mutex);
+#+end_src
+Usando un approccio a 2 task, una per ogni ruota, si potrebbe sostituire il mutex lock con un rwlock per evitare di bloccare inutilmente le 2 task di sola lettura di controllo ruote, anche se per una così breve sezione critica non porterebbe a grandi miglioramenti.
 
+La velocità è data in millimetri al secondo ed è quindi necessario convertirla in un valore di tick che aspettiamo verranno misurati dai 2 encoder:
+#+begin_src c
 // (tick/s) * (ms / 1000ms) = tick
 u64 target_ticks_left = target_ticksXsec_left * ((f32)period_ms / 1000.);
 u64 target_ticks_right = target_ticksXsec_right * ((f32)period_ms / 1000.);
-#+end_src
-Usando un approccio a 2 task, una per ogni ruota, si potrebbe sostituire il mutex lock con un rwlock per evitare di bloccare inutilmente le 2 task di sola lettura di controllo ruote.
-
-La velocità è data in millimetri al secondo ed è quindi necessario convertirla in un valore di tick che aspettiamo verranno misurati dai 2 encoder.
-
-`libcoderbot` non espone un lock per la lettura dei tick quindi lettura e scrittura possono avvenire in modo asincrono. Per evitare letture di tick sfasate, questi vengono salvati in altre 2 variabili protette da sezione critica per la condivisione con la task di odometria.
-#+begin_src c
-os_mutex_lock(state.tick.mutex);
-state.tick.measured_left = cb_encoder_left.ticks;
-state.tick.measured_right = cb_encoder_right.ticks;
-os_mutex_unlock(state.tick.mutex);
 #+end_src
 
 Dopodiche viene determinato il nuovo duty cycle dei motori in base all'errore tra tick misurati dagli encoder e tick attesi, scalato in base alle costante proporzionali `Kp_Left`, `Kp_Right` e con l'aggiunta dell'errore accumulato durante l'intera esecuzione della task, scalato in base alle costanti integrali `Ki_Left`, `Ki_Right`.
@@ -82,13 +77,17 @@ cbMotorMove(&cb_motor_left, motor_direction_left, duty_cycle_left);
 cbMotorMove(&cb_motor_right, motor_direction_right, duty_cycle_right);
 #+end_src
 
+Durante i test di movimento lineare del coderbot, abbiamo osservato che, con valori di duty cycle elevati, la differenza tra i tick riportati dai 2 encoder variava significativamente. I tick misurati dall'encoder sinistro erano decisamente maggiori di quelli misuarti dall'encoder destro, il che portava il robot a tendere verso la destra.
+Dopo ulteriori misure abbiamo stabilito che impostare valori di duty cycle minori di `0.2` è equivalente ad un duty cycle nullo, viceversa impostando valori maggiori di `0.6`, il rapporto tra tick misurati e duty cycle non era più lineare. Per ovviare a queste 2 situazioni abbiamo quindi deciso di limitare il valore di duty cycle dei 2 encoder hai valori $\left[0.1,0.6\right]$.
+[[file:./img/pwm-ticks.jpg]]
+
 Trovare i valori delle costanti `Kp_Left`, `Kp_Right`, `Ki_Left`, `Ki_Right` è anchesso stato fatto in maniera sperimentale separatamente.
-Per le costanti proporzionali si è cercato di trovarle andado a modificarle leggermente ad ogni esecuzione del programma cercando di aggiustarle per far andare il coderbot dritto. Una volta trovate queste, si è passati alle costanti integrali che, analogamente, sono state regolate gradualmente con l'obiettivo di ridurre il delta tra i tick desiderati e tick misurati.
+Per le costanti proporzionali si è cercato di trovarle andado a modificarle leggermente ad ogni esecuzione del programma cercando di aggiustarle per correggere l'andatura del robot. Una volta trovate queste, si è passati alle costanti integrali che, analogamente, sono state regolate gradualmente con l'obiettivo di ridurre la discrepanza tra i tick desiderati e tick misurati.
 
 * Odometria
 ** Rappresentazione delle pose del robot
 #+attr_latex: :width 300
-[[file:~/Pictures/coderbot-graph.jpg]]
+[[file:./img/coderbot-graph.jpg]]
 
 La pose del coderbot (/la sua rotazione e posizione corrente/) viene modellata tramite una matrice $3\times3$  $\text{pose}=\begin{bmatrix}R_{xx}&R_{yx}&P_x\\R_{xy}&R_{yy}&P_y\\0&0&1\end{bmatrix}$, dove:
 - $\bold R_{x}$ è il versore dell'asse X del sistema di riferimento attaccato al corpo del coderbot.
@@ -125,3 +124,25 @@ Per aggiornare la pose del coderbot, è stata applicata una rototraslazione `rt`
 - rotazione della matrice $\text{t1}= \begin{bmatrix}1&0&0\\0&1&-d\\0&0&1\end{bmatrix}$, ovvero la matrice che esprime la posizione del CIR rispetto alla pose attuale del coderbot, di un angolo $\theta$ rispetto l'asse Z del sistema di riferimento /world/: $R_z(\theta)\cdot\text{t1}$. Moltiplicando la pose del coderbot per questa matrice intermedia $\text{pose}\cdot (R_z(\theta)\cdot\text{t1})$ stiamo allineando il coderbot con il CIR e vi stiamo applicando una rotazione rispetto l'asse Z.
 - applicazione di una traslazione inversa per riportare il coderbot alla posizione originale tramite moltiplicazione della matrice intermedia per $\text{t2}= \begin{bmatrix}1&0&0\\0&1&d\\0&0&1\end{bmatrix}$, anch'essa definita nel sistema /world/: $\text{rt}=\text{t2}\cdot R_z(\theta)\cdot\text{t1}$.
 Infine, la nuova pose del robot nel sistema /body/ è ottenuta applicando la rototraslazione `rt` alla pose corrente: $\text{new pose} = \text{pose}\cdot\text{rt}$.
+
+* Generazione della traiettoria
+Il movimento del coderbot è stabilito da un percorso predefinito, il quale viene generato offline come una sequenza di punti in un piano bidimensionale. A runtime la task di controllo cartesiano cerca il punto della traiettoria più vicino alla posizione attuale, la quale viene aggiornata dalla task di odometria, confrontando solo i punti nell'intorno della posizione corrente, al fine di determinare un obiettivo intermedio da raggiungere.
+
+La definizione della traiettoria avviene tramite concatenzazione delle primitive di generazione di archi di rotazione e rette.
+
+** Esempio
+#+begin_src c
+generate_arc_points(0, 900, 900, -90.f, 0.f);
+generate_arc_points(1800, 900, 900, 180.f, 0.f);
+generate_line_points(2700, 900, 900, -90.f);
+#+end_src
+
+La prima chiamata genera un arco rispetto ad un centro di rotazione posizionato in $(0cm,90cm)$ rispetto alla posizione iniziale del coderbot e di raggio $90cm$. I restanti 2 argomenti indicano l'angolo iniziale del robot rispetto alla circonferenza e l'angolo finale/obiettivo.
+
+[[file:./img/gen_arc_example.jpg]]
+
+Similarmente la seconda chiamata genera un arco rispetto ad un centro di rotazione posizionato in $(180cm,90cm)$ rispetto alla posizione iniziale del coderbot e di raggio $90cm$. La posizione di questo secondo centro di rotazione deve essere tale da potre continuare la traiettoria precedente ininterrottamente.
+Infine l'ultima chiamata genera un porzione di traiettoria rettilinea con inizio alle coordinate $(270cm, 90cm)$ di lunghezza $90cm$ e con un'inclinazione di $-90^\circ$.
+
+La traiettoria finale sarà:
+[[file:./img/2025-07-09-114530_hyprshot.png]]

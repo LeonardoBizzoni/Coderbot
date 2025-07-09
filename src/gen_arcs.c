@@ -5,57 +5,63 @@
 
 #include "cartesian_controller.h"
 
-#define Chunks 22
+#define Chunks 3
+#define N_POINTS 50
 
-global struct {
-  struct {f32 x, y;} waypoints[N_POINTS * Chunks];
-} state = {0};
+global struct {f32 x, y;} waypoints[N_POINTS * Chunks] = {0};
 
-#include "cartesian_controller.c"
+global i32 chunk = 0;
+fn void generate_arc_points(f32 center_x, f32 center_y, f32 radius,
+                            f32 start_angle, f32 end_angle) {
+  f32 start_radians = start_angle * M_PI / 180.f;
+  f32 end_radians = end_angle * M_PI / 180.f;
+  for (i32 i = 0; i < N_POINTS; ++i) {
+    f32 t = (f32)i / (N_POINTS - 1);
+    f32 radians = start_radians + t * (end_radians - start_radians);
+    waypoints[i + chunk * N_POINTS].x = center_x + radius * cosf(radians);
+    waypoints[i + chunk * N_POINTS].y = center_y + radius * sinf(radians);
+  }
+  chunk += 1;
+}
+
+fn void generate_line_points(f32 start_x, f32 start_y, f32 length_mm, f32 angle) {
+  f32 radians = angle * M_PI / 180.f;
+  for (i32 i = 0; i < N_POINTS; ++i) {
+    f32 amount = ClampTop(i * (length_mm / N_POINTS), length_mm);
+    waypoints[i + chunk * N_POINTS].x = start_x + amount * cosf(radians);
+    waypoints[i + chunk * N_POINTS].y = start_y + amount * sinf(radians);
+  }
+  chunk += 1;
+}
 
 fn void start(CmdLine *cmd) {
-  generate_arc_points(0, 900, 900, -90.f, -270.f); // C
-  generate_line_points(400, 0, 1800, 90.f); // I
-  { // A
-    generate_line_points(600, 0, 1800, 75.f);
-    generate_line_points(600 + 1800 * cosf(75.f * M_PI / 180.f), 1800, 1800, -75.f);
-    generate_line_points(600 + 900 * cosf(75.f * M_PI / 180.f), 900,
-                         2 * 900 * cosf(75.f * M_PI / 180.f), 0.f);
-  }
-  generate_arc_points(3000, 900, 900, 0.f, 360.f); // O
+  Arena *arena = ArenaBuild();
 
-  generate_arc_points(6000, 900, 900, -90.f, -270.f); // C
-  { // A
-    generate_line_points(6000 + 400, 0, 1800, 75.f);
-    generate_line_points(6000 + 400 + 1800 * cosf(75.f * M_PI / 180.f), 1800, 1800, -75.f);
-    generate_line_points(6000 + 400 + 900 * cosf(75.f * M_PI / 180.f), 900,
-                         2 * 900 * cosf(75.f * M_PI / 180.f), 0.f);
-  }
-  { // M
-    generate_line_points(7700, 0, 1800, 90.f); // I
-    generate_line_points(7700, 1800, 900, -45.f); // "\"
-    generate_line_points(7700 + 900 * cosf(45.f * M_PI / 180.f),
-                         1800 - 900 * sinf(45.f * M_PI / 180.f), 900, 45.f); // "/"
-    generate_line_points(7700 + 2 * 900 * cosf(45.f * M_PI / 180.f), 0, 1800, 90.f); // I
-  }
-  generate_line_points(9400, 0, 1800, 90.f); // I
-  { // L
-    generate_line_points(10000, 0, 1800, 90.f); // I
-    generate_line_points(10000, 0, 1800, 0.f); // _
-  }
-  { // L
-    generate_line_points(10000 + 1800 + 400, 0, 1800, 90.f); // I
-    generate_line_points(10000 + 1800 + 400, 0, 1800, 0.f); // _
-  }
-  { // A
-    generate_line_points(14400, 0, 1800, 75.f);
-    generate_line_points(14400 + 1800 * cosf(75.f * M_PI / 180.f), 1800, 1800, -75.f);
-    generate_line_points(14400 + 900 * cosf(75.f * M_PI / 180.f), 900,
-                         2 * 900 * cosf(75.f * M_PI / 180.f), 0.f);
-  }
+  OS_Handle trajectory = fs_open(Strlit("src/trajectory.h"), OS_acfWrite);
+  fs_write(trajectory, Strlit("#ifndef GEN_TRAJECTORY_H\n#define GEN_TRAJECTORY_H\n"));
+  fs_write(trajectory, str8_format(arena, "#define N_POINTS %d\n",
+                                   N_POINTS * Chunks));
+
+  generate_arc_points(0, 900, 900, -90.f, 0.f);
+  generate_arc_points(1800, 900, 900, 180.f, 0.f);
+  generate_line_points(2700, 900, 900, -90.f);
+
+  StringStream ss = {0};
+  strstream_append_str(arena, &ss, str8_format(arena, "global Points waypoints[N_POINTS] = {",
+                                               N_POINTS * Chunks));
 
   for (i32 i = 0; i < N_POINTS * Chunks; ++i) {
-    printf("(%f, %f), ", state.waypoints[i].x, state.waypoints[i].y);
+    printf("(%f, %f), ", waypoints[i].x, waypoints[i].y);
+    strstream_append_str(arena, &ss, str8_format(arena, "{%f,%f}", waypoints[i].x,
+                                                 waypoints[i].y));
+    if (i < (N_POINTS * Chunks) - 1) {
+      strstream_append_str(arena, &ss, Strlit(","));
+    }
   }
+  strstream_append_str(arena, &ss, Strlit("};"));
   printf("\b\b\n");
+
+  fs_write(trajectory, str8_from_stream(arena, ss));
+  fs_write(trajectory, Strlit("\n#endif"));
+  fs_close(trajectory);
 }
