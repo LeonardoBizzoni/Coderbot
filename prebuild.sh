@@ -11,11 +11,13 @@ dbg_flags="-ggdb -O0 -DENABLE_ASSERT=1 -DDEBUG=1 $asan"
 flags="$links $common_flags $no_annoying_warnings "
 
 expected_trajectory=$(gcc $flags $dbg_flags src/gen_arcs.c -o gen_args.o && ./gen_args.o)
-# TODO(lb): does this work?
-# followed_trajectory=$(ssh coderbot@icecube3 << EOF
-#                                             cd LB/Progetto;
-#                                             ./build.sh odometry release >> /dev/null;
-#                                             sudo ./main.o;
-#                           EOF)
-# Rscript grafico_coderbot.R "$expected_trajectory" "$followed_trajectory"
-Rscript grafico_coderbot.R "$expected_trajectory" "(2000, 2000)"
+GLOBIGNORE=".git" scp -r ./* coderbot@icecube3:LB/Progetto
+
+followed_trajectory=$(ssh coderbot@icecube3 << 'EOF'
+cd LB/Progetto;
+./build.sh odometry release >> /dev/null;
+echo 'coderbot' | sudo -S ./main.o;
+EOF
+)
+Rscript grafico_coderbot.R "$expected_trajectory" "$followed_trajectory"
+# Rscript grafico_coderbot.R "$expected_trajectory" "(2000, 2000)"

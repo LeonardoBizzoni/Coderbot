@@ -39,29 +39,22 @@ fn void start(CmdLine *cmd) {
 
   OS_Handle trajectory = fs_open(Strlit("src/trajectory.h"), OS_acfWrite);
   fs_write(trajectory, Strlit("#ifndef GEN_TRAJECTORY_H\n#define GEN_TRAJECTORY_H\n"));
-  fs_write(trajectory, str8_format(arena, "#define N_POINTS %d\n",
-                                   N_POINTS * Chunks));
+  fs_write(trajectory, str8_format(arena, "#define N_POINTS %d\n", N_POINTS * Chunks));
 
   generate_arc_points(0, 900, 900, -90.f, 0.f);
   generate_arc_points(1800, 900, 900, 180.f, 0.f);
   generate_line_points(2700, 900, 900, -90.f);
 
-  StringStream ss = {0};
-  strstream_append_str(arena, &ss, str8_format(arena, "global Points waypoints[N_POINTS] = {",
-                                               N_POINTS * Chunks));
-
+  fs_write(trajectory, Strlit("global Points waypoints[N_POINTS] = {"));
   for (i32 i = 0; i < N_POINTS * Chunks; ++i) {
     printf("(%f, %f), ", waypoints[i].x, waypoints[i].y);
-    strstream_append_str(arena, &ss, str8_format(arena, "{%f,%f}", waypoints[i].x,
-                                                 waypoints[i].y));
+    fs_write(trajectory, str8_format(arena, "{%f,%f}", waypoints[i].x, waypoints[i].y));
     if (i < (N_POINTS * Chunks) - 1) {
-      strstream_append_str(arena, &ss, Strlit(","));
+      fs_write(trajectory, Strlit(","));
     }
   }
-  strstream_append_str(arena, &ss, Strlit("};"));
   printf("\b\b\n");
 
-  fs_write(trajectory, str8_from_stream(arena, ss));
-  fs_write(trajectory, Strlit("\n#endif"));
+  fs_write(trajectory, Strlit("};\n#endif\n"));
   fs_close(trajectory);
 }
