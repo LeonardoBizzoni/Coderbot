@@ -5,7 +5,7 @@
 
 #include "cartesian_controller.h"
 
-#define Chunks 3
+#define Chunks 1
 #define N_POINTS 50
 
 global struct {f32 x, y;} waypoints[N_POINTS * Chunks] = {0};
@@ -41,9 +41,7 @@ fn void start(CmdLine *cmd) {
   fs_write(trajectory, Strlit("#ifndef GEN_TRAJECTORY_H\n#define GEN_TRAJECTORY_H\n"));
   fs_write(trajectory, str8_format(arena, "#define N_POINTS %d\n", N_POINTS * Chunks));
 
-  generate_arc_points(0, 900, 900, -90.f, 0.f);
-  generate_arc_points(1800, 900, 900, 180.f, 0.f);
-  generate_line_points(2700, 900, 900, -90.f);
+  generate_arc_points(0, -900, 900, 90.f, 0.f);
 
   fs_write(trajectory, Strlit("global Points waypoints[N_POINTS] = {"));
   for (i32 i = 0; i < N_POINTS * Chunks; ++i) {
