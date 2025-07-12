@@ -17,8 +17,10 @@
 #define Duty_CycleFromTicks_Left  0.5469512
 #define Duty_CycleFromTicks_Right 0.1771385
 
-#define MillimeterFromTicks_Left  0.1306443689
-#define MillimeterFromTicks_Right 0.1330557259
+/* #define MillimeterFromTicks_Left  0.1306443689 */
+/* #define MillimeterFromTicks_Right 0.1330557259 */
+#define MillimeterFromTicks_Left  0.11147909938205335
+#define MillimeterFromTicks_Right 0.1117455840579235
 #define Kp_Left  Duty_CycleFromTicks_Left
 #define Kp_Right Duty_CycleFromTicks_Right
 #define Ki_Left  0.01

@@ -5,7 +5,7 @@
 
 #include "cartesian_controller.h"
 
-#define Chunks 1
+#define Chunks 3
 #define N_POINTS 50
 
 global struct {f32 x, y;} waypoints[N_POINTS * Chunks] = {0};
